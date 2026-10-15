@@ -1,131 +1,159 @@
+<div align="center">
+
+<img src="public/favicon.svg" alt="Isla Universal" width="76">
+
 # Isla Universal
 
-Juego de estrategia de mesa con tablero 3D isométrico, interfaz en español y una identidad visual propia. Adaptación independiente de las mecánicas del juego base de CATAN, sin utilizar sus ilustraciones, modelos ni otros recursos oficiales.
+**Una isla. Infinitas posibilidades.**
 
-## Jugar
+Construye poblados, negocia recursos y reúne a tus amigos alrededor de un tablero 3D.
 
-La partida inicial te enfrenta a dos rivales automáticos. Pulsa **Nueva partida** para elegir tu nombre, 3 o 4 participantes y jugar contra la IA o con personas compartiendo el dispositivo. **Salas online** abre los modos Online y Party.
+**[▶ Jugar ahora](https://isla-universal.vercel.app/)** · [Capturas](#capturas) · [Modos de juego](#modos-de-juego) · [Desarrollo](docs/DEVELOPMENT.md)
+
+<sub>THREE.JS · TYPESCRIPT · VITE · VERCEL</sub>
+
+</div>
+
+<br>
+
+[![Tablero 3D de Isla Universal con poblados, carreteras y recursos de un jugador](docs/screenshots/gameplay.png)](https://isla-universal.vercel.app/)
+
+> Juego de estrategia en español, inspirado en las mecánicas del juego base de CATAN, con identidad visual propia y modelos generados en código. Juega desde el navegador, sin instalar aplicaciones ni crear una cuenta.
+
+## Modos de juego
+
+| Modo | Con quién juegas | Cómo se juega |
+| --- | --- | --- |
+| 🤖 **Solo** | Tú y rivales automáticos | Construye, negocia y compite contra la IA. |
+| 🏠 **Local** | Amigos en el mismo dispositivo | Comparte la pantalla y pasa el dispositivo entre turnos. |
+| 🌍 **Online** | Amigos desde cualquier lugar | Crea una sala y comparte su código, enlace o QR. |
+| 📺 **Party** | Amigos con sus propios móviles | El tablero en la televisión y las cartas privadas en cada móvil. |
+
+**Partidas de 3 o 4 jugadores.** Online y Party necesitan al menos dos personas; las plazas restantes se completan con IA.
+
+## Capturas
+
+### El tablero en la televisión
+
+La isla, los poblados, las carreteras y los puntos quedan a la vista de todos. La pantalla de TV no ocupa plaza de jugador ni recibe manos privadas.
+
+![Tablero público del modo Party con tres jugadores y sus construcciones](docs/screenshots/party-tv.png)
+
+<table>
+<tr>
+<td width="72%" align="center"><strong>Una sala, un código y un QR</strong></td>
+<td width="28%" align="center"><strong>Tu móvil es el mando</strong></td>
+</tr>
+<tr>
+<td valign="top"><img src="docs/screenshots/party-lobby.png" alt="Vestíbulo Party con código, QR y jugadores preparados" width="100%"></td>
+<td valign="top"><img src="docs/screenshots/party-mobile.png" alt="Mando móvil Party con cartas privadas, dados y controles de construcción" width="100%"></td>
+</tr>
+<tr>
+<td valign="top">Comparte la invitación y reúne a los jugadores antes de empezar.</td>
+<td valign="top">Consulta tus recursos y decide tu siguiente jugada.</td>
+</tr>
+</table>
+
+<sub>Capturas de una partida de demostración. Para entrar en una partida, utiliza el QR de tu propia sala.</sub>
+
+## Empieza a jugar
+
+### Una partida rápida
+
+1. Abre **[Isla Universal](https://isla-universal.vercel.app/)**. La partida inicial te enfrenta a dos rivales automáticos.
+2. Pulsa **Nueva partida** para elegir tu nombre, el modo y el número de jugadores.
+3. Coloca tus dos poblados iniciales y sus carreteras gratuitas.
+4. Lanza los dados, construye y comercia. **Gana quien alcance 10 puntos de victoria durante su turno.**
+
+Arrastra el tablero para girar la cámara y usa la rueda o los botones **+/−** para acercarte. Puedes construir directamente sobre el tablero o utilizar **Ver ubicaciones**.
 
 ### Online con amigos
 
-1. Abre https://isla-universal.vercel.app/, pulsa **Salas online → Online** y crea una sala de 3 o 4 plazas.
-2. Comparte el código de siete caracteres, el enlace de invitación o su QR. Tus amigos entran desde sus propios navegadores con su nombre.
-3. Todos los jugadores pulsan **Estoy listo**. El anfitrión pulsa **Empezar partida**. Se necesitan dos personas como mínimo; las plazas restantes se completan con IA.
-4. Cada participante ve su propia mano y puede actuar cuando le corresponda. Las ofertas llegan al destinatario y los descartes se eligen desde el dispositivo de cada afectado.
+1. Entra en **Salas online → Online** y crea una sala.
+2. Comparte el **código de siete caracteres**, el enlace o el QR.
+3. Cada amigo entra desde su navegador y elige su nombre.
+4. Todos pulsan **Estoy listo** y el anfitrión selecciona **Empezar partida**.
 
-### Party: televisión y mandos móviles
+Cada participante ve su propia mano. Los intercambios llegan al dispositivo de su destinatario y cada jugador elige sus propios descartes.
 
-Abre el juego en el navegador de la televisión, o conecta un ordenador por HDMI o duplicación de pantalla. Selecciona **Salas online → Party · TV**. Esa pantalla queda como tablero público y no ocupa plaza de jugador. Los participantes escanean el QR o introducen el código desde sus móviles; incluso el anfitrión entra como jugador desde otro navegador/dispositivo.
+### Party: todos al sofá
 
-Los móviles muestran las cartas privadas y los controles de turno. **Elegir ubicación** permite seleccionar cruces y tramos cuyos números aparecen en la televisión; **Ver tablero** permite consultar también el tablero 3D en el móvil. La TV ofrece pantalla completa. Todos los dispositivos necesitan internet; pueden estar en redes diferentes. No hace falta instalar aplicaciones.
+1. Abre el juego en el navegador de la **televisión**, o conecta un ordenador por HDMI o duplicación de pantalla.
+2. Selecciona **Salas online → Party · TV**.
+3. Los jugadores escanean el QR con sus móviles. El anfitrión también se une como jugador desde otro dispositivo.
+4. Marcaos como listos y comenzad desde la pantalla de TV.
 
-Las salas caducan 48 horas después de crearse. Recarga el mismo navegador con el enlace de la sala para recuperar tu plaza: el acceso se conserva en ese navegador, no en el código público. No borres los datos del sitio ni cambies a otro navegador durante una partida. Tras empezar, no se admiten nuevos jugadores. Si alguien se desconecta, la partida espera sus acciones; no hay sustitución automática ni migración del anfitrión.
+El móvil muestra tus cartas y las acciones de tu turno. **Elegir ubicación** usa los números de cruces y tramos que aparecen en la TV; **Ver tablero** permite consultar también el tablero 3D en el móvil. Todos los dispositivos necesitan internet y pueden estar en redes diferentes.
 
-1. Selecciona un cruce iluminado para fundar un poblado y después un tramo contiguo para su carretera gratuita. Cada participante coloca dos parejas, en orden de ida y vuelta.
-2. Lanza los dados. Todos los poblados junto a las parcelas del número obtenido reciben recursos; las ciudades reciben el doble.
-3. Usa los botones inferiores para construir, comprar desarrollo o comerciar. Selecciona las construcciones directamente en el tablero o con **Ver ubicaciones**.
-4. Termina tu turno. Gana quien alcanza 10 puntos de victoria durante su propio turno.
+## Lo que encontrarás en la isla
 
-Arrastra el tablero para rotar la cámara, usa la rueda o los controles +/− para acercarte y la brújula para restablecer la vista. Haz clic en una parcela para consultar su producción o en un puerto para consultar su tarifa.
+- **Un tablero diferente en cada partida:** 19 hexágonos, cinco recursos, nueve puertos y distribución sin 6 y 8 adyacentes.
+- **Construcciones 3D:** funda poblados, traza carreteras y mejora tus asentamientos a ciudades.
+- **Comercio con decisiones:** banco, puertos e intercambios entre personas e IA con aceptación explícita.
+- **Cartas de desarrollo:** caballeros, carreteras, monopolio, abundancia y puntos de victoria secretos.
+- **El ladrón:** descartes con un 7, bloqueo de producción y elección de una carta rival boca abajo.
+- **La carrera por los puntos:** carretera más larga, mayor ejército y victoria a 10 puntos.
+- **Arte procedural:** bosques, ovejas, montañas, cultivos, muelles y océano animado, modelados en código.
 
-Las partidas se guardan automáticamente en `localStorage` después de cada acción. El menú de ajustes permite exportarlas e importarlas como JSON y activar sonidos. En móvil, los ajustes están en la barra superior. En partidas locales aparece una pantalla de traspaso para revelar la mano del siguiente participante. Es una medida de cortesía para un dispositivo compartido; los datos del juego no están cifrados y pueden consultarse con herramientas del navegador.
+<details>
+<summary><strong>🤝 Cómo negocia la IA</strong></summary>
 
-## Qué incluye esta versión
+En tu turno, abre **Comerciar → Entre jugadores**, selecciona un rival y elige los recursos que entregas y pides. La IA valora sus recursos, las construcciones que puede preparar, la producción del tablero y los puntos públicos del rival; puede rechazar una oferta aunque pueda pagarla.
 
-- Tablero aleatorio de 19 hexágonos, 54 cruces y 72 tramos. Distribución estándar de terrenos y fichas de producción, sin 6 y 8 adyacentes.
-- Cinco recursos, banco finito de 19 cartas por recurso y producción con reglas de escasez.
-- Poblados, ciudades y carreteras con costes, conexión, distancia mínima e inventario de piezas: 5 poblados, 4 ciudades y 15 carreteras por participante.
-- Ladrón, descarte obligatorio con un 7 y selección de una carta boca abajo de un rival adyacente.
-- Nueve puertos, comercio bancario 4:1, general 3:1 y especializado 2:1. Ofertas entre personas e IA con aceptación explícita.
-- Mazo estándar de 25 cartas: 14 caballeros, 5 puntos de victoria, 2 de carreteras, 2 de monopolio y 2 de abundancia. Restricciones de antigüedad y una carta jugada por turno.
-- Carretera más larga calculada como recorrido sin reutilizar aristas, interrupción por edificios rivales y conservación del titular en caso de empate. Mayor ejército y puntos secretos de desarrollo.
-- Rivales automáticos con colocación por probabilidad, construcción, mejoras, cartas, comercio bancario, negociación con otros participantes y decisiones de ladrón.
-- Escena procedural de Three.js: bosques, ovejas, montañas, campos, arcilla, poblados, ciudades, muelles, ladrón y océano animado. Todos los modelos se generan en código.
+La IA también propone intercambios durante su turno. La partida espera tu aceptación o rechazo y las cartas solo cambian de mano tras aceptar. Cada rival automático propone como máximo un trato a cada participante por turno.
 
-El juego base utiliza **carreteras** terrestres. Los barcos, puentes y otras reglas de expansiones no están incluidos. Se puede jugar localmente, online por código y en Party con televisión y móviles, sin cuentas. La IA es heurística, no un jugador experto. No hay comercio antes de lanzar los dados.
+Sus propuestas usan su propia mano, el tablero y las cantidades públicas de cartas, sin consultar los tipos de recursos ocultos de sus rivales.
 
-## Robo del ladrón
+</details>
 
-Después de mover el ladrón, se abre la selección de robo si hay rivales con un poblado o una ciudad adyacente y al menos una carta de recurso. Si hay varios, eliges a cuál robar; si solo hay uno, se muestra directamente su mano boca abajo. Pulsa una de sus cartas para completar el robo: mover el ladrón o elegir al rival no transfiere cartas automáticamente.
+<details>
+<summary><strong>🃏 Cómo funciona el robo del ladrón</strong></summary>
 
-Solo se muestra la cantidad de cartas de recursos y sus reversos, sin indicar sus tipos. Las posiciones se barajan al realizar el robo y todas tienen la misma probabilidad de contener cada carta. Las cartas de desarrollo están excluidas. Si nadie es elegible, aparece una explicación y el turno continúa. Este mismo flujo se aplica a los caballeros, conservando la fase de dados cuando se juegan antes de lanzar. Si recargas durante un robo pendiente, la selección vuelve a abrirse.
+Después de mover el ladrón, elige un rival con un poblado o ciudad junto a esa parcela y al menos una carta de recurso. Si solo hay uno, su mano aparece directamente boca abajo. Pulsa una carta para completar el robo.
 
-## Intercambios con la IA
+Los reversos no revelan tipos de recursos. Sus posiciones se barajan al robar y todas tienen la misma probabilidad de contener cada carta. Las cartas de desarrollo quedan excluidas. Si nadie es elegible, el turno continúa con una explicación.
 
-En tu turno, abre **Comerciar → Entre jugadores**, selecciona un rival automático y elige los recursos que entregas y pides. La IA responde según sus recursos disponibles, las construcciones que puede preparar, la producción de sus parcelas y los puntos públicos del rival. Puede rechazar un trato aunque disponga de las cartas solicitadas; el motivo aparece en el aviso y en la bitácora.
+El mismo flujo se aplica a los caballeros y conserva la fase de dados si se juegan antes de lanzar. Los robos y las ofertas pendientes se recuperan al recargar la partida.
 
-Durante su turno, la IA también propone intercambios antes de recurrir al banco. Puedes aceptar o rechazar sus ofertas; la partida espera tu respuesta. Cada rival automático propone como máximo un trato a cada participante por turno, para evitar repeticiones. La IA negocia entre sí de forma automática y genera sus propuestas usando su propia mano, el tablero y las cantidades públicas de cartas, sin consultar los tipos de recursos ocultos de otros participantes.
+</details>
 
-Las cartas cambian de mano únicamente tras aceptar, y se comprueba que ambas partes pueden pagar. Si no tienes los recursos solicitados, puedes rechazar la propuesta. Las ofertas pendientes se guardan y se recuperan al recargar o importar una partida; también se pueden seguir usando las partidas anteriores a esta actualización.
+## Guardado y reconexión
 
-## Desarrollo
+| Partidas locales | Salas Online y Party |
+| --- | --- |
+| Guardado automático en este navegador. | Estado guardado en el servidor. |
+| Exporta e importa partidas JSON desde **Ajustes**. | Recupera tu plaza desde el enlace de la sala en el **mismo navegador**. |
+| Pantalla de traspaso para compartir el dispositivo. | Solo recibes tus cartas privadas; la TV recibe datos públicos. |
 
-Requisitos: Node.js 24 y npm. En desarrollo las salas se guardan en `.isla-rooms/`, excluido de Git; no necesitas claves externas. El plugin de Vite sirve tanto la interfaz como `/api/rooms`, también con `npm run preview`. Puedes cambiar la carpeta con `ISLA_ROOM_DIR`.
+Las salas duran **48 horas desde su creación**. Conserva los datos del sitio para recuperar tu acceso. Después de empezar solo pueden volver los participantes originales; si alguien se desconecta, la partida espera sus acciones. No hay sustitución automática ni migración del anfitrión.
+
+La pantalla de traspaso local es una medida de cortesía: la partida completa reside en el navegador. En Online y Party, el servidor valida las reglas y oculta las manos ajenas antes de enviarlas.
+
+## Para desarrollar
+
+Requiere **Node.js 24** y npm. En desarrollo, las salas se guardan en archivos locales y no necesitan credenciales externas.
 
 ```sh
-cd /workspace/CatanUniversal
+git clone https://github.com/Rapidfiend34/CatanUniversal.git
+cd CatanUniversal
 npm ci
 npm run dev -- --port 5173
 ```
 
-```sh
-npm test          # Reglas e integración: incluye partidas completas hasta victoria
-npm run build    # TypeScript y compilación optimizada en dist/
-npm run preview -- --port 4173
-```
+Abre **http://localhost:5173**.
 
-Las pruebas de navegador esperan un servidor de desarrollo en el puerto 5173:
-
-```sh
-npm run test:e2e
-```
-
-La configuración de Playwright usa `/usr/bin/chromium`, disponible en este entorno cloud. En otra máquina indica el ejecutable con `CHROMIUM_PATH=/ruta/al/chromium npm run test:e2e`. Las capturas y trazas se guardan en `test-results/`, excluido de Git. La escena requiere WebGL; para equipos sin WebGL hay un aviso y un selector alternativo de construcciones.
-
-El entorno cloud ya está aislado: utiliza este checkout existente. No hace falta crear un worktree salvo petición expresa.
-
-## Despliegue en Vercel
-
-`vercel.json` configura Vite, `npm ci`, `npm run build`, salida `dist` y la función Node.js `api/rooms.ts`. Despliega la raíz del repositorio completa, incluyendo `api/` y `server/`; publicar solo `dist/` deja disponibles únicamente los modos locales.
-
-Para Online y Party, crea un almacén **privado de Vercel Blob** y conéctalo al proyecto en los entornos que vayas a usar. Vercel proporciona `BLOB_READ_WRITE_TOKEN` a la función; nunca lo expongas con prefijo `VITE_` ni lo envíes al cliente. El proyecto publicado ya tiene conectado `isla-universal-rooms` en Frankfurt y la función se ejecuta en esa región. El consumo de funciones y Blob depende del uso y de los límites del plan de Vercel.
-
-Opciones de publicación:
-
-1. Conecta el repositorio que contenga estos archivos a tu cuenta de Vercel, importa el proyecto y acepta el framework Vite. Vercel ejecutará la compilación y emitirá la URL de producción.
-2. Desde una máquina autenticada en Vercel, ejecuta `npx vercel --prod` en la raíz del proyecto y selecciona tu cuenta/proyecto.
-
-Para que Codex publique desde este entorno, hace falta acceso autorizado a tu cuenta. Se ha declarado `VERCEL_TOKEN` como requisito de despliegue en los ajustes seguros del entorno, con destino `api.vercel.com`. No escribas tokens en el chat, archivos del repositorio ni comandos que los impriman. Los dominios `api.vercel.com` y `*.vercel.app` se han añadido al borrador de red para publicación y verificación. Revisa y guarda los cambios del entorno y publícalo cuando corresponda; guardar el borrador no aplica ni publica por sí solo la configuración.
-
-**Publicación:** el juego está disponible en https://isla-universal.vercel.app/ en Vercel. El código fuente se conserva en https://github.com/Rapidfiend34/CatanUniversal. Las futuras actualizaciones requieren desplegar el código fuente; el proyecto actual no está conectado a Git para despliegue automático.
-
-La carpeta `dist/` puede alojarse también en cualquier servidor web estático con HTTPS para jugar contra la IA o en el mismo dispositivo. Las salas requieren además la API y almacenamiento privado persistente.
-
-## Servidor de salas y privacidad
-
-El servidor es la autoridad de las reglas, dados, mazo, robos y turnos de la IA. Cada dispositivo conserva un secreto aleatorio de 256 bits; el servidor almacena únicamente su hash para reconocer la plaza. El código sirve para unirse, no para recuperar identidades ajenas. La API proyecta la partida por participante: devuelve solo su mano, cantidades públicas de cartas y puntos visibles. La TV no recibe manos, cartas de desarrollo privadas ni orden del mazo, ni siquiera a través del diagnóstico `window.__isla`.
-
-La sincronización consulta el servidor aproximadamente cada 1,4 segundos con la pestaña visible, y cada 5 segundos en segundo plano. Se usan versiones, identificadores de acción y escrituras condicionales por ETag para rechazar acciones obsoletas, duplicados y cambios simultáneos incompatibles. Las lecturas son privadas y no se cachean. Las consultas sin cambios no reescriben el almacenamiento.
-
-En producción, los documentos viven en Vercel Blob privado y sobreviven a reinicios de funciones y nuevos despliegues. A las 48 horas se deniega el acceso, aunque los documentos no se borran automáticamente del almacén: su eliminación administrativa corresponde al propietario del proyecto. Las salas de desarrollo se guardan en archivos privados, con control de concurrencia. La limitación de creación/unión por IP es básica y por instancia; no sustituye protección distribuida para un servicio de gran escala.
-
-## Estructura
-
-| Archivo | Responsabilidad |
+| Comando | Qué hace |
 | --- | --- |
-| `src/engine.ts` | Estado serializable y comandos con validación; no depende del navegador ni de Three.js. |
-| `src/bot.ts` | Decisiones de los participantes automáticos. |
-| `src/trading.ts` | Valoración de ofertas y generación de propuestas de la IA, sin inspeccionar las manos ocultas de sus rivales. |
-| `src/board.ts` | Modelos 3D, cámara, iluminación, selección y visualización de ubicaciones legales. |
-| `src/main.ts` | Interfaz, modales, guardado, importación/exportación y turnos. |
-| `src/style.css` | Diseño adaptable de escritorio y móvil. |
-| `src/online/` | Protocolo de vistas privadas y cliente de salas con reconexión. |
-| `server/rooms.ts` | Autorización, vestíbulo, reglas y turnos automáticos del servidor. |
-| `server/store.ts` | Persistencia con escrituras condicionales en Blob o archivos. |
-| `api/rooms.ts` | Entrada de la función HTTP para Vercel. |
-| `tests/engine.test.ts` | Reglas, conservación de recursos y simulaciones completas. |
-| `tests/rooms.test.ts` | Autorización, privacidad, concurrencia, reintentos y persistencia. |
-| `tests/game.spec.ts` | Pruebas reales de navegador con Playwright. |
-| `tests/online.spec.ts` | Amigos en navegadores independientes y Party con TV y móviles. |
+| `npm test` | Reglas, integración del servidor y partidas completas de IA. |
+| `npm run build` | Comprueba TypeScript del cliente y servidor y genera `dist/`. |
+| `npm run test:e2e` | Prueba la interfaz con navegadores independientes y móviles simulados. |
 
-El motor usa actualizaciones inmutables mediante `execute(estado, comando)`; una operación ilegal lanza `RuleError` sin modificar el estado anterior. La aleatoriedad se puede inyectar para pruebas reproducibles. La escena recibe el estado final y no decide las reglas del juego.
+**[Guía técnica y arquitectura →](docs/DEVELOPMENT.md)**
+
+**[Despliegue de producción en Vercel →](DEPLOYMENT.md)**
+
+Para publicar Online y Party necesitas desplegar también la API y conectar almacenamiento privado. La guía técnica incluye la configuración, la privacidad y los límites operativos.
+
+---
+
+<sub>Adaptación independiente inspirada en CATAN. No utiliza ilustraciones, modelos ni recursos oficiales. Incluye las mecánicas del juego base: las expansiones, barcos y puentes no están implementados. La IA es heurística y no se permite comerciar antes de lanzar los dados.</sub>
