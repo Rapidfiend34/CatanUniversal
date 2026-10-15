@@ -21,13 +21,21 @@ Las partidas se guardan automáticamente en `localStorage` después de cada acci
 - Cinco recursos, banco finito de 19 cartas por recurso y producción con reglas de escasez.
 - Poblados, ciudades y carreteras con costes, conexión, distancia mínima e inventario de piezas: 5 poblados, 4 ciudades y 15 carreteras por participante.
 - Ladrón, descarte obligatorio con un 7 y robo aleatorio a un rival adyacente.
-- Nueve puertos, comercio bancario 4:1, general 3:1 y especializado 2:1. Ofertas entre personas locales con aceptación explícita.
+- Nueve puertos, comercio bancario 4:1, general 3:1 y especializado 2:1. Ofertas entre personas e IA con aceptación explícita.
 - Mazo estándar de 25 cartas: 14 caballeros, 5 puntos de victoria, 2 de carreteras, 2 de monopolio y 2 de abundancia. Restricciones de antigüedad y una carta jugada por turno.
 - Carretera más larga calculada como recorrido sin reutilizar aristas, interrupción por edificios rivales y conservación del titular en caso de empate. Mayor ejército y puntos secretos de desarrollo.
-- Rivales automáticos con colocación por probabilidad, construcción, mejoras, cartas, comercio bancario y decisiones de ladrón.
+- Rivales automáticos con colocación por probabilidad, construcción, mejoras, cartas, comercio bancario, negociación con otros participantes y decisiones de ladrón.
 - Escena procedural de Three.js: bosques, ovejas, montañas, campos, arcilla, poblados, ciudades, muelles, ladrón y océano animado. Todos los modelos se generan en código.
 
-El juego base utiliza **carreteras** terrestres. Los barcos, puentes y otras reglas de expansiones no están incluidos. Esta versión permite partidas completas locales; no incluye salas online, cuentas, servidor multijugador ni sincronización entre dispositivos. La IA es heurística, no un jugador experto, y no negocia ofertas con personas. No hay intercambio bancario antes de lanzar los dados.
+El juego base utiliza **carreteras** terrestres. Los barcos, puentes y otras reglas de expansiones no están incluidos. Esta versión permite partidas completas locales; no incluye salas online, cuentas, servidor multijugador ni sincronización entre dispositivos. La IA es heurística, no un jugador experto. No hay comercio antes de lanzar los dados.
+
+## Intercambios con la IA
+
+En tu turno, abre **Comerciar → Entre jugadores**, selecciona un rival automático y elige los recursos que entregas y pides. La IA responde según sus recursos disponibles, las construcciones que puede preparar, la producción de sus parcelas y los puntos públicos del rival. Puede rechazar un trato aunque disponga de las cartas solicitadas; el motivo aparece en el aviso y en la bitácora.
+
+Durante su turno, la IA también propone intercambios antes de recurrir al banco. Puedes aceptar o rechazar sus ofertas; la partida espera tu respuesta. Cada rival automático propone como máximo un trato a cada participante por turno, para evitar repeticiones. La IA negocia entre sí de forma automática y genera sus propuestas usando su propia mano, el tablero y las cantidades públicas de cartas, sin consultar los tipos de recursos ocultos de otros participantes.
+
+Las cartas cambian de mano únicamente tras aceptar, y se comprueba que ambas partes pueden pagar. Si no tienes los recursos solicitados, puedes rechazar la propuesta. Las ofertas pendientes se guardan y se recuperan al recargar o importar una partida; también se pueden seguir usando las partidas anteriores a esta actualización.
 
 ## Desarrollo
 
@@ -76,6 +84,7 @@ La carpeta `dist/` puede alojarse también en cualquier servidor web estático c
 | --- | --- |
 | `src/engine.ts` | Estado serializable y comandos con validación; no depende del navegador ni de Three.js. |
 | `src/bot.ts` | Decisiones de los participantes automáticos. |
+| `src/trading.ts` | Valoración de ofertas y generación de propuestas de la IA, sin inspeccionar las manos ocultas de sus rivales. |
 | `src/board.ts` | Modelos 3D, cámara, iluminación, selección y visualización de ubicaciones legales. |
 | `src/main.ts` | Interfaz, modales, guardado, importación/exportación y turnos. |
 | `src/style.css` | Diseño adaptable de escritorio y móvil. |

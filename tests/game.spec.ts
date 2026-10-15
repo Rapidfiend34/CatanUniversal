@@ -13,12 +13,18 @@ async function pickLocation(page: Page) {
   await page.locator('[data-act="locations"]').first().click();
   await page.locator('.location-row').first().click();
 }
-async function importGame(page: Page, g: Game) {
+async function importGame(page: Page, g: Game, dialogExpected = false) {
   await page.getByRole('button', { name: 'Opciones de partida' }).click();
   await page.locator('#import-game').setInputFiles({ name: 'partida.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(g)) });
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  if (!dialogExpected) await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 function setupGame(): Game { let g = newGame([{ name: 'Lucía', bot: false }, { name: 'Mateo', bot: false }, { name: 'Eva', bot: false }]); while (g.phase.startsWith('setup')) g = execute(g, botCommand(g)); return g; }
+function aiTradingGame() {
+  const g=setupGame();g.phase='action';g.players.forEach((p,i)=>{p.hand=emptyHand();p.bot=i>0;});
+  g.players[0].hand={...emptyHand(),ore:2,wood:1};g.players[1].hand={...emptyHand(),wood:3,wheat:2,ore:2};
+  for(const r of RESOURCES)g.bank[r]=19-g.players.reduce((n,p)=>n+p.hand[r],0);
+  return g;
+}
 
 test('3D canvas renders, real pointer builds a settlement, road selection persists', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
@@ -131,4 +137,57 @@ test('mandatory discard, robber movement and stolen resource resolve in the UI',
   await page.getByRole('button',{name:'Devolver recursos'}).click();expect((await state(page)).phase).toBe('robber');
   await pickLocation(page);g=await state(page);if(g.phase==='steal')await page.locator('[data-victim]').first().click();
   expect((await state(page)).phase).toBe('action');await expect(page.getByRole('button',{name:'Terminar turno'})).toBeEnabled();
+});
+
+test('human can select an AI, get an accepted offer, and receive a strategic rejection', async ({page})=>{
+  await page.goto('/');const g=aiTradingGame();await importGame(page,g);
+  async function propose(give:string,receive:string){
+    await page.getByRole('button',{name:'Comerciar',exact:true}).click();await page.locator('[data-trade-tab="players"]').click();
+    await page.locator('#offer-form [name="player"]').selectOption('1');
+    await page.locator(`#offer-form [name="give-${give}"]`).fill('1');await page.locator(`#offer-form [name="receive-${receive}"]`).fill('1');
+    await page.getByRole('button',{name:'Proponer intercambio'}).click();
+  }
+  await propose('ore','wood');
+  await expect.poll(async()=>(await state(page)).log[0]).toContain('Mateo acepta');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const accepted=await state(page);expect(accepted.players[0].hand.ore).toBe(1);expect(accepted.players[0].hand.wood).toBe(2);expect(accepted.players[1].hand.ore).toBe(3);
+  await propose('wood','ore');
+  await expect.poll(async()=>(await state(page)).log[0]).toContain('Mateo rechaza');
+  const rejected=await state(page);expect(rejected.players.map(p=>p.hand)).toEqual(accepted.players.map(p=>p.hand));expect(rejected.bank).toEqual(accepted.bank);
+  await expect(page.locator('#toast')).toContainText('Prefiero conservar');
+});
+
+test('AI proposal waits for the human across reload and a refusal transfers no cards',async({page})=>{
+  await page.goto('/');let g=aiTradingGame();g.current=1;g=execute(g,botCommand(g));expect(g.pendingTrade?.to).toBe(0);
+  await importGame(page,g,true);await expect(page.getByRole('dialog')).toContainText('Mateo te propone');
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toBeVisible();
+  await page.reload();await expect(page.getByRole('dialog')).toContainText('La partida espera tu decisión');
+  await page.waitForTimeout(1200);expect((await state(page)).pendingTrade).toEqual(g.pendingTrade);
+  await page.getByRole('button',{name:'Rechazar oferta',exact:true}).click();const after=await state(page);
+  expect(after.pendingTrade).toBeNull();expect(after.players.map(p=>p.hand)).toEqual(g.players.map(p=>p.hand));expect(after.current).toBe(1);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(async()=>(await state(page)).current).not.toBe(1);
+});
+
+test('AI initiates a trade on its turn and resumes building after human acceptance',async({page})=>{
+  await page.goto('/');const g=aiTradingGame();g.current=1;
+  await importGame(page,g,true);await expect(page.getByRole('dialog')).toContainText('Mateo te propone');
+  await expect(page.getByRole('button',{name:'Aceptar intercambio'})).toBeEnabled();
+  expect((await state(page)).players.map(p=>p.hand)).toEqual(g.players.map(p=>p.hand));
+  await page.screenshot({path:'test-results/ai-trade.png'});
+  await page.getByRole('button',{name:'Aceptar intercambio'}).click();
+  const after=await state(page);expect(after.pendingTrade).toBeNull();expect(after.players[0].hand.ore).toBe(g.players[0].hand.ore-1);expect(after.players[0].hand.wood).toBe(g.players[0].hand.wood+1);
+  await expect.poll(async()=>(await state(page)).vertices.filter(v=>v.owner===1&&v.city).length).toBe(1);
+});
+
+test('AI-to-AI trades resolve automatically and an unaffordable human offer can be declined',async({page})=>{
+  await page.goto('/');let g=aiTradingGame();g.current=1;g.players[2].hand={...emptyHand(),ore:1};g.bank.ore--;
+  g=execute(g,{type:'offer',player:2,give:{...emptyHand(),wood:1},receive:{...emptyHand(),ore:1}});
+  await importGame(page,g);await expect.poll(async()=>(await state(page)).pendingTrade).toBeNull();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Import another valid pending offer asking the human for a resource they lack.
+  let unfunded=aiTradingGame();unfunded.current=1;
+  unfunded=execute(unfunded,{type:'offer',player:0,give:{...emptyHand(),wood:1},receive:{...emptyHand(),brick:1}});
+  await importGame(page,unfunded,true);await expect(page.getByRole('button',{name:'Aceptar intercambio'})).toBeDisabled();
+  await page.getByRole('button',{name:'Rechazar oferta'}).click();expect((await state(page)).pendingTrade).toBeNull();
 });

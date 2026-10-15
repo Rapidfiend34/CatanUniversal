@@ -11,8 +11,9 @@ export interface Tile { id: number; q: number; r: number; x: number; z: number; 
 export interface Vertex { id: number; x: number; z: number; tiles: number[]; edges: number[]; owner: number | null; city: boolean; port?: Resource | 'any' }
 export interface Edge { id: number; a: number; b: number; tiles: number[]; owner: number | null }
 export interface Player { name: string; bot: boolean; color: string; hand: Hand; dev: { type: Dev; turn: number }[]; knights: number; played: boolean }
+export interface TradeOffer { from: number; to: number; give: Hand; receive: Hand }
 export type Phase = 'setup-settlement' | 'setup-road' | 'roll' | 'discard' | 'robber' | 'steal' | 'action' | 'finished';
-export interface Game { version: 1; tiles: Tile[]; vertices: Vertex[]; edges: Edge[]; players: Player[]; bank: Hand; deck: Dev[]; current: number; phase: Phase; setup: number; anchor: number | null; turn: number; dice: [number, number] | null; robber: number; discards: number[]; resume: 'roll' | 'action'; victims: number[]; freeRoads: number; longest: number | null; army: number | null; winner: number | null; log: string[]; lastProduction: number[] }
+export interface Game { version: 1; tiles: Tile[]; vertices: Vertex[]; edges: Edge[]; players: Player[]; bank: Hand; deck: Dev[]; current: number; phase: Phase; setup: number; anchor: number | null; turn: number; dice: [number, number] | null; robber: number; discards: number[]; resume: 'roll' | 'action'; victims: number[]; freeRoads: number; longest: number | null; army: number | null; winner: number | null; log: string[]; lastProduction: number[]; pendingTrade?: TradeOffer | null; tradeAttempts?: number[] }
 export const COSTS: Record<'road' | 'settlement' | 'city' | 'dev', Partial<Hand>> = { road: { wood: 1, brick: 1 }, settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 }, city: { wheat: 2, ore: 3 }, dev: { sheep: 1, wheat: 1, ore: 1 } };
 export function shuffle<T>(items: T[], rng = Math.random): T[] { const a = [...items]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 export function newGame(config: { name: string; bot: boolean }[], rng = Math.random): Game {
@@ -88,12 +89,19 @@ function awards(g: Game) {
     else if (g[kind] === null || !candidates.includes(g[kind]!)) g[kind] = null;
   }
 }
-export type Command = { type: 'settlement' | 'city' | 'road'; id: number } | { type: 'roll' } | { type: 'end' } | { type: 'robber'; tile: number } | { type: 'steal'; player: number } | { type: 'discard'; player: number; cards: Hand } | { type: 'trade'; give: Resource; receive: Resource } | { type: 'offer'; player: number; give: Hand; receive: Hand } | { type: 'buy' } | { type: 'dev'; card: Dev; resources?: Resource[] };
+export type Command = { type: 'settlement' | 'city' | 'road'; id: number } | { type: 'roll' } | { type: 'end' } | { type: 'robber'; tile: number } | { type: 'steal'; player: number } | { type: 'discard'; player: number; cards: Hand } | { type: 'trade'; give: Resource; receive: Resource } | { type: 'offer'; player: number; give: Hand; receive: Hand } | { type: 'respond'; player: number; accept: boolean; reason?: string } | { type: 'buy' } | { type: 'dev'; card: Dev; resources?: Resource[] };
 export class RuleError extends Error {}
 const requireRule = (ok: unknown, message: string): void => { if (!ok) throw new RuleError(message); };
+export function validateTrade(g: Game, offer: TradeOffer, requireBothHands = false): void {
+  requireRule(offer.from === g.current && Number.isInteger(offer.to) && g.players[offer.to] && offer.to !== offer.from, 'Elige otro jugador.');
+  requireRule(offer.give && offer.receive && RESOURCES.every(r => Number.isInteger(offer.give[r]) && Number.isInteger(offer.receive[r]) && offer.give[r] >= 0 && offer.receive[r] >= 0 && offer.receive[r] <= 19 && (!offer.give[r] || !offer.receive[r])) && total(offer.give) > 0 && total(offer.receive) > 0, 'La oferta debe intercambiar recursos distintos y cantidades válidas.');
+  requireRule(RESOURCES.every(r => g.players[offer.from].hand[r] >= offer.give[r]), 'No tienes los recursos que ofreces.');
+  if (requireBothHands) requireRule(RESOURCES.every(r => g.players[offer.to].hand[r] >= offer.receive[r]), 'El destinatario no tiene los recursos solicitados.');
+}
 export function execute(state: Game, cmd: Command, rng = Math.random): Game {
   const g = structuredClone(state), p = g.players[g.current];
   requireRule(g.phase !== 'finished', 'La partida ha terminado.');
+  requireRule(!g.pendingTrade || cmd.type === 'respond', 'Responde al intercambio pendiente antes de continuar.');
   const say = (s: string) => { g.log.unshift(s); g.log = g.log.slice(0, 70); };
   const pay = (cost: Partial<Hand>) => { requireRule(canAfford(g, cost), 'No tienes suficientes recursos.'); RESOURCES.forEach(r => { const n = cost[r] || 0; p.hand[r] -= n; g.bank[r] += n; }); };
   const action = () => requireRule(g.phase === 'action' && !g.freeRoads, 'Completa la acción pendiente primero.');
@@ -156,9 +164,17 @@ export function execute(state: Game, cmd: Command, rng = Math.random): Game {
       p.hand[cmd.give] -= ratio; g.bank[cmd.give] += ratio; p.hand[cmd.receive]++; g.bank[cmd.receive]--; say(`${p.name} comercia con el banco (${ratio}:1).`); break;
     }
     case 'offer': {
-      action(); const other = g.players[cmd.player]; requireRule(other && cmd.player !== g.current, 'Elige otro jugador.');
-      requireRule(total(cmd.give) > 0 && total(cmd.receive) > 0 && RESOURCES.every(r => Number.isInteger(cmd.give[r]) && Number.isInteger(cmd.receive[r]) && cmd.give[r] >= 0 && cmd.receive[r] >= 0 && (!cmd.give[r] || !cmd.receive[r]) && p.hand[r] >= cmd.give[r] && other.hand[r] >= cmd.receive[r]), 'La oferta no es válida o faltan recursos.');
-      RESOURCES.forEach(r => { p.hand[r] += cmd.receive[r] - cmd.give[r]; other.hand[r] += cmd.give[r] - cmd.receive[r]; }); say(`${p.name} intercambia recursos con ${other.name}.`); break;
+      action(); const offer: TradeOffer = { from: g.current, to: cmd.player, give: cmd.give, receive: cmd.receive }; validateTrade(g, offer);
+      if (p.bot) { requireRule(!g.tradeAttempts?.includes(cmd.player), 'Ya has propuesto un trato a este jugador durante este turno.'); g.tradeAttempts = [...(g.tradeAttempts || []), cmd.player]; }
+      g.pendingTrade = offer; say(`${p.name} propone un intercambio a ${g.players[cmd.player].name}.`); break;
+    }
+    case 'respond': {
+      const offer = g.pendingTrade;
+      requireRule(offer && cmd.player === offer.to && typeof cmd.accept === 'boolean', 'Solo el destinatario puede responder a esta oferta.');
+      const other = g.players[offer!.to];
+      if (cmd.accept) { validateTrade(g, offer!, true); RESOURCES.forEach(r => { p.hand[r] += offer!.receive[r] - offer!.give[r]; other.hand[r] += offer!.give[r] - offer!.receive[r]; }); say(`${other.name} acepta: ${p.name} intercambia recursos con ${other.name}.`); }
+      else say(`${other.name} rechaza el intercambio de ${p.name}.${cmd.reason ? ' ' + cmd.reason.slice(0, 180) : ''}`);
+      g.pendingTrade = null; break;
     }
     case 'buy': action(); requireRule(g.deck.length > 0, 'No quedan cartas de desarrollo.'); pay(COSTS.dev); p.dev.push({ type: g.deck.pop()!, turn: g.turn }); say(`${p.name} compra una carta de desarrollo.`); break;
     case 'dev': {
@@ -170,7 +186,7 @@ export function execute(state: Game, cmd: Command, rng = Math.random): Game {
       if (cmd.card === 'plenty') { const rs = cmd.resources || []; requireRule(rs.length === 2 && rs.every(r => RESOURCES.includes(r)), 'Elige dos recursos.'); const h = emptyHand(); rs.forEach(r => h[r]++); requireRule(RESOURCES.every(r => g.bank[r] >= h[r]), 'El banco no tiene esos recursos.'); RESOURCES.forEach(r => { g.bank[r] -= h[r]; p.hand[r] += h[r]; }); }
       p.dev.splice(i, 1); p.played = true; say(`${p.name} juega ${DEV_NAMES[cmd.card]}.`); break;
     }
-    case 'end': action(); g.current = (g.current + 1) % g.players.length; g.turn++; g.players[g.current].played = false; g.phase = 'roll'; g.dice = null; g.lastProduction = []; say(`Turno de ${g.players[g.current].name}.`); break;
+    case 'end': action(); g.current = (g.current + 1) % g.players.length; g.turn++; g.players[g.current].played = false; g.phase = 'roll'; g.dice = null; g.lastProduction = []; g.tradeAttempts = []; say(`Turno de ${g.players[g.current].name}.`); break;
   }
   awards(g);
   if (g.turn && points(g, g.current) >= 10) { g.winner = g.current; g.phase = 'finished'; say(`${g.players[g.current].name} gana con ${points(g, g.current)} puntos.`); }

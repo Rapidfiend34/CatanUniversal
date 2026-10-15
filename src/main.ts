@@ -1,6 +1,6 @@
 import './style.css';
 import { Board, type Mode } from './board';
-import { type Game, type Command, type Hand, type Dev, type Resource, newGame, execute, RESOURCES, NAMES, DEV_NAMES, COSTS, COLORS, total, points, legalRoads, legalSettlements, longestLength, tradeRatio, canAfford, countBuildings, emptyHand } from './engine';
+import { type Game, type Command, type Hand, type Dev, type Resource, newGame, execute, RESOURCES, NAMES, DEV_NAMES, COSTS, COLORS, total, points, legalRoads, legalSettlements, longestLength, tradeRatio, canAfford, countBuildings, emptyHand, validateTrade } from './engine';
 import { botCommand } from './bot';
 import { icon } from './icons';
 
@@ -42,20 +42,22 @@ function sound(kind = 'click') {
 }
 function toast(message: string) { const el = document.querySelector<HTMLDivElement>('#toast')!; el.textContent = message; el.hidden = false; window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => { el.hidden = true; }, 4200); }
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch { toast('No se puede guardar en este navegador. Exporta tu partida desde el menú.'); } }
-function isHuman() { return !game.players[game.current].bot && passTo === null && game.phase !== 'finished'; }
+function isHuman() { return !game.players[game.current].bot && passTo === null && game.phase !== 'finished' && !game.pendingTrade; }
 function dispatch(command: Command, automated = false) {
   try {
-    const old = game.current; game = execute(game, command); mode = 'inspect';
+    const old = game.current, previousOffer = game.pendingTrade; game = execute(game, command); mode = 'inspect';
+    if (command.type === 'respond') { if (activeModal === 'offer-pending') closeModal(); if (previousOffer && (!game.players[previousOffer.from].bot || !game.players[previousOffer.to].bot)) toast(game.log[0]); }
     if (command.type === 'road' || command.type === 'settlement' || command.type === 'city') sound('build'); else if (command.type === 'roll') sound('dice');
     if (!automated && command.type === 'end' || old !== game.current) { if (!game.players[game.current].bot && game.players.filter(p => !p.bot).length > 1 && old !== game.current) passTo = game.current; }
     save(); render(); scheduleBot();
   } catch (e) { toast(e instanceof Error ? e.message : 'No se pudo completar la acción.'); if (automated) { window.clearTimeout(botTimer); console.error('AI error', e); toast('El rival automático se ha detenido. Exporta la partida para conservarla.'); } }
 }
-function humanViewIndex() { return game.players[game.current].bot ? Math.max(0, game.players.findIndex(p => !p.bot)) : game.current; }
+function humanViewIndex() { if (game.pendingTrade && !game.players[game.pendingTrade.to].bot) return game.pendingTrade.to; return game.players[game.current].bot ? Math.max(0, game.players.findIndex(p => !p.bot)) : game.current; }
 function resourceIcon(r: Resource, size = 22) { return `<span class="resource-symbol ${r}">${icon(r, size)}</span>`; }
 function costHtml(cost: Partial<Hand>) { return Object.entries(cost).map(([r, n]) => `<span class="cost-item ${r}" title="${n} ${NAMES[r as Resource]}">${icon(r, 13)}${n! > 1 ? n : ''}</span>`).join(''); }
 function phaseText() {
   const name = esc(game.players[game.current].name);
+  if (game.pendingTrade) return { tag: 'UN TRATO SOBRE LA MESA', title: 'El comercio nos conecta.', text: `${esc(game.players[game.pendingTrade.to].name)} debe responder antes de continuar el turno.` };
   if (game.phase === 'finished') return { tag: 'UNA HISTORIA PARA RECORDAR', title: `¡${esc(game.players[game.winner!].name)} gana!`, text: 'La isla tiene un nuevo referente. Empieza otra aventura cuando quieras.' };
   if (game.phase === 'setup-settlement') return { tag: `FUNDACIÓN · RONDA ${game.setup < game.players.length ? '1' : '2'} DE 2`, title: 'Todo empieza aquí.', text: `${name}, elige un cruce iluminado para fundar tu ${game.setup < game.players.length ? 'primer' : 'segundo'} poblado.` };
   if (game.phase === 'setup-road') return { tag: 'TRAZA TU CAMINO', title: 'Conecta con el futuro.', text: `${name}, construye una carretera junto a tu nuevo poblado. Es gratuita.` };
@@ -92,6 +94,7 @@ function render() {
     </div>`;
   board?.update(g, mode, human);
   if (passTo !== null) showPass();
+  else if (g.pendingTrade && (!g.players[g.pendingTrade.from].bot || !g.players[g.pendingTrade.to].bot)) showPendingTrade();
   else if (g.phase === 'discard' && !g.players[g.discards.findIndex(Boolean)]?.bot) showDiscard();
   else if (g.phase === 'finished' && activeModal !== 'results') showResults();
 }
@@ -109,7 +112,7 @@ function showTile(id: number) {
 }
 function scheduleBot() {
   window.clearTimeout(botTimer); if (game.phase === 'finished' || passTo !== null) return;
-  const actor = game.phase === 'discard' ? game.discards.findIndex(Boolean) : game.current;
+  const actor = game.pendingTrade ? game.pendingTrade.to : game.phase === 'discard' ? game.discards.findIndex(Boolean) : game.current;
   if (!game.players[actor]?.bot) return;
   botTimer = window.setTimeout(() => { dispatch(botCommand(game), true); }, game.phase.startsWith('setup') ? 750 : 800);
 }
@@ -147,8 +150,22 @@ function showDiscard() {
 function showTrade() {
   if (!isHuman() || game.phase !== 'action' || game.freeRoads) return;
   const opts = RESOURCES.map(r => `<option value="${r}">${NAMES[r]}</option>`).join('');
-  modal('trade', 'Un buen trato lo cambia todo.', 'Intercambia con el banco o acuerda una oferta con otro jugador local.', `<div class="tabs"><button class="tab active" data-trade-tab="bank">Banco y puertos</button><button class="tab" data-trade-tab="players">Entre jugadores</button></div><form id="trade-form"><div class="trade-fields"><label class="field-label">ENTREGAS<select name="give">${opts}</select></label><span>${icon('trade', 25)}</span><label class="field-label">RECIBES<select name="receive">${opts}</select></label></div><div class="trade-ratio" id="trade-ratio"></div><p class="form-note">Los puertos se activan al construir en sus extremos. El banco tiene ${RESOURCES.map(r => `${game.bank[r]} ${NAMES[r].toLowerCase()}`).join(', ')}.</p><button class="primary-button full" type="submit">Realizar intercambio ${icon('trade', 18)}</button></form><form id="offer-form" hidden><label class="field-label">COMERCIAR CON<select name="player">${game.players.map((p, i) => i !== game.current ? `<option value="${i}" ${p.bot ? 'disabled' : ''}>${esc(p.name)}${p.bot ? ' · IA: usa el banco' : ''}</option>` : '').join('')}</select></label><div class="offer-head"><span>RECURSO</span><span>ENTREGAS</span><span>PIDES</span></div>${RESOURCES.map(r => `<div class="offer-row"><span>${resourceIcon(r, 17)} ${NAMES[r]}</span><input type="number" name="give-${r}" aria-label="Entregar ${NAMES[r]}" value="0" min="0" max="${game.players[game.current].hand[r]}"><input type="number" name="receive-${r}" aria-label="Pedir ${NAMES[r]}" value="0" min="0" max="19"></div>`).join('')}<p class="form-note">El otro jugador deberá aceptar la oferta en este dispositivo. Los rivales automáticos comercian solo con el banco.</p><button class="primary-button full" type="submit" ${game.players.filter(p => !p.bot).length < 2 ? 'disabled' : ''}>Proponer intercambio ${icon('arrow', 18)}</button></form>`);
+  modal('trade', 'Un buen trato lo cambia todo.', 'Negocia con personas y rivales automáticos, o intercambia con el banco.', `
+    <div class="tabs"><button class="tab active" data-trade-tab="bank">Banco y puertos</button><button class="tab" data-trade-tab="players">Entre jugadores</button></div>
+    <form id="trade-form"><div class="trade-fields"><label class="field-label">ENTREGAS<select name="give">${opts}</select></label><span>${icon('trade', 25)}</span><label class="field-label">RECIBES<select name="receive">${opts}</select></label></div><div class="trade-ratio" id="trade-ratio"></div><p class="form-note">Los puertos se activan al construir en sus extremos. El banco tiene ${RESOURCES.map(r => `${game.bank[r]} ${NAMES[r].toLowerCase()}`).join(', ')}.</p><button class="primary-button full" type="submit">Realizar intercambio ${icon('trade', 18)}</button></form>
+    <form id="offer-form" hidden><label class="field-label">COMERCIAR CON<select name="player">${game.players.map((p, i) => i !== game.current ? `<option value="${i}">${esc(p.name)}${p.bot ? ' · IA' : ''}</option>` : '').join('')}</select></label><div class="offer-head"><span>RECURSO</span><span>ENTREGAS</span><span>PIDES</span></div>${RESOURCES.map(r => `<div class="offer-row"><span>${resourceIcon(r, 17)} ${NAMES[r]}</span><input type="number" name="give-${r}" aria-label="Entregar ${NAMES[r]}" value="0" min="0" max="${game.players[game.current].hand[r]}"><input type="number" name="receive-${r}" aria-label="Pedir ${NAMES[r]}" value="0" min="0" max="19"></div>`).join('')}
+    <p class="form-note">La IA valorará si el trato le ayuda a construir y te responderá. También puede proponerte intercambios durante su turno. Las cartas solo se entregan tras aceptar la oferta.</p><button class="primary-button full" type="submit">Proponer intercambio ${icon('arrow', 18)}</button></form>`);
   updateRatio();
+}
+function showPendingTrade() {
+  const offer = game.pendingTrade!;
+  const from = game.players[offer.from], recipient = game.players[offer.to], waiting = recipient.bot;
+  const incoming = waiting ? offer.receive : offer.give, outgoing = waiting ? offer.give : offer.receive;
+  const describe = (cards: Hand) => RESOURCES.filter(r => cards[r]).map(r => `<span class="trade-chip">${resourceIcon(r, 19)} <b>${cards[r]}</b> ${NAMES[r]}</span>`).join('');
+  const affordable = RESOURCES.every(r => recipient.hand[r] >= offer.receive[r]);
+  modal('offer-pending', waiting ? `${esc(recipient.name)} está valorando tu oferta.` : `${esc(recipient.name)}, ¿cerramos el trato?`, waiting ? 'El rival decide según sus recursos, sus posibilidades de construir y la situación de la partida.' : `${esc(from.name)} te propone este intercambio. ${from.bot ? 'La partida espera tu decisión.' : 'Pasa el dispositivo al destinatario.'}`, `
+    <div class="offer-preview"><h3>Recibes</h3><div class="trade-chips">${describe(incoming)}</div><h3>Entregas</h3><div class="trade-chips">${describe(outgoing)}</div></div>
+    ${waiting ? `<p class="trade-waiting" role="status">${icon('bot', 20)} Preparando respuesta…</p>` : `${!affordable ? '<p class="form-note">No tienes todos los recursos solicitados. Puedes rechazar esta oferta.</p>' : ''}<button class="primary-button full" data-act="accept-offer" ${affordable ? '' : 'disabled'}>Aceptar intercambio ${icon('trade', 18)}</button><button class="text-button full" data-act="reject-offer">Rechazar oferta</button>`}`, false, true);
 }
 function updateRatio() { const form = document.querySelector<HTMLFormElement>('#trade-form'); if (!form) return; const r = new FormData(form).get('give') as Resource; document.querySelector('#trade-ratio')!.innerHTML = `<b>${tradeRatio(game, r)} : 1</b><span>Entregas ${tradeRatio(game, r)} de ${NAMES[r].toLowerCase()} por 1 recurso a tu elección.</span>`; }
 function showCards() {
@@ -181,7 +198,7 @@ app.addEventListener('click', e => {
     case 'help': showHelp(); break;
     case 'new': showNew(); break;
     case 'settings': showSettings(); break;
-    case 'close-modal': if (passTo === null && game.phase !== 'discard') closeModal(); break;
+    case 'close-modal': if (passTo === null && game.phase !== 'discard' && !game.pendingTrade) closeModal(); break;
     case 'close-tile': document.querySelector<HTMLElement>('#tile-info')!.hidden = true; break;
     case 'cancel-build': mode = 'inspect'; render(); break;
     case 'roll': dispatch({ type: 'roll' }); break;
@@ -197,7 +214,8 @@ app.addEventListener('click', e => {
     case 'log': modal('log', 'Historias de la isla.', 'Las últimas 70 acciones de esta expedición.', `<div class="full-log">${game.log.map(s => `<p>${esc(s)}</p>`).join('')}</div>`); break;
     case 'sound': muted = !muted; sound(); showSettings(); break;
     case 'export': { const url = URL.createObjectURL(new Blob([JSON.stringify(game, null, 2)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `isla-universal-turno-${game.turn}.json`; a.click(); URL.revokeObjectURL(url); toast('Partida exportada.'); break; }
-    case 'accept-offer': { const raw = button.dataset.offer; if (raw) { const cmd = JSON.parse(raw) as Command; closeModal(); dispatch(cmd); } break; }
+    case 'accept-offer':
+    case 'reject-offer': if (game.pendingTrade && !game.players[game.pendingTrade.to].bot) dispatch({ type: 'respond', player: game.pendingTrade.to, accept: button.dataset.act === 'accept-offer' }); break;
   }
 });
 app.addEventListener('submit', e => {
@@ -208,9 +226,7 @@ app.addEventListener('submit', e => {
   if (form.id === 'dev-form') { const resources = [data.get('first') as Resource]; if (data.get('second')) resources.push(data.get('second') as Resource); const prev = game; dispatch({ type: 'dev', card: form.dataset.card as Dev, resources }); if (prev !== game) closeModal(); }
   if (form.id === 'offer-form') {
     const give = emptyHand(), receive = emptyHand(); RESOURCES.forEach(r => { give[r] = Number(data.get(`give-${r}`)); receive[r] = Number(data.get(`receive-${r}`)); }); const cmd: Command = { type: 'offer', player: Number(data.get('player')), give, receive };
-    try { execute(game, cmd); } catch (e) { toast((e as Error).message); return; }
-    const recipient = game.players[cmd.player];
-    modal('offer', `${esc(recipient.name)}, ¿cerramos el trato?`, 'Pasa el dispositivo al destinatario. La operación solo se realiza al aceptar.', `<div class="offer-preview"><h3>Recibes</h3><p>${RESOURCES.filter(r => give[r]).map(r => `${give[r]} ${NAMES[r]}`).join(' · ')}</p><h3>Entregas</h3><p>${RESOURCES.filter(r => receive[r]).map(r => `${receive[r]} ${NAMES[r]}`).join(' · ')}</p></div><button class="primary-button full" data-act="accept-offer" data-offer="${esc(JSON.stringify(cmd))}">Aceptar intercambio ${icon('trade', 18)}</button><button class="text-button full" data-act="close-modal">Rechazar oferta</button>`);
+    dispatch(cmd);
   }
 });
 app.addEventListener('change', async e => {
@@ -231,9 +247,11 @@ function validateSave(g: Game) {
   for (const [i, v] of g.vertices.entries()) if (v.id !== i || !Number.isFinite(v.x) || !Number.isFinite(v.z) || !v.edges.every(e => !!g.edges[e]) || !v.tiles.every(t => !!g.tiles[t]) || v.owner !== null && !g.players[v.owner]) throw new Error('Invalid graph');
   for (const [i, e] of g.edges.entries()) if (e.id !== i || !g.vertices[e.a] || !g.vertices[e.b] || e.owner !== null && !g.players[e.owner]) throw new Error('Invalid graph');
   for (const [i, t] of g.tiles.entries()) if (t.id !== i || !Number.isFinite(t.x) || !Number.isFinite(t.z) || ![...RESOURCES, 'desert'].includes(t.resource) || !t.vertices.every(v => !!g.vertices[v])) throw new Error('Invalid graph');
+  if (g.tradeAttempts !== undefined && (!Array.isArray(g.tradeAttempts) || g.tradeAttempts.length > g.players.length - 1 || new Set(g.tradeAttempts).size !== g.tradeAttempts.length || !g.tradeAttempts.every(i => Number.isInteger(i) && !!g.players[i] && i !== g.current))) throw new Error('Invalid trade attempts');
+  if (g.pendingTrade !== undefined && g.pendingTrade !== null) { if (g.phase !== 'action' || g.freeRoads) throw new Error('Invalid pending trade phase'); validateTrade(g, g.pendingTrade); }
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && passTo === null && game.phase !== 'discard') { closeModal(); mode = 'inspect'; render(); }
+  if (e.key === 'Escape' && passTo === null && game.phase !== 'discard' && !game.pendingTrade) { closeModal(); mode = 'inspect'; render(); }
   if (e.key === 'Tab' && activeModal) { const root = document.querySelector('.modal')!; const elements = [...root.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([hidden]), select, [tabindex="0"]')].filter(el => el.offsetParent !== null); const first = elements[0], last = elements.at(-1); if (e.shiftKey && (document.activeElement === first || document.activeElement === root)) { e.preventDefault(); last?.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); } }
 });
 // A read-only diagnostic surface also enables real pointer-based browser tests.

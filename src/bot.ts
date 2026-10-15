@@ -1,4 +1,5 @@
 import { type Game, type Command, type Resource, RESOURCES, COSTS, canAfford, legalSettlements, legalRoads, countBuildings, tradeRatio, emptyHand, points } from './engine';
+import { assessTrade, botTradeProposal } from './trading';
 
 export function siteScore(g: Game, id: number, p = g.current): number {
   const v = g.vertices[id];
@@ -7,6 +8,7 @@ export function siteScore(g: Game, id: number, p = g.current): number {
 }
 function best<T>(items: T[], score: (a: T) => number): T { return [...items].sort((a, b) => score(b) - score(a))[0]; }
 export function botCommand(g: Game): Command {
+  if (g.pendingTrade) { const decision = assessTrade(g, g.pendingTrade); return { type: 'respond', player: g.pendingTrade.to, ...decision }; }
   const p = g.players[g.current];
   switch (g.phase) {
     case 'setup-settlement': return { type: 'settlement', id: best(legalSettlements(g), id => siteScore(g, id)) };
@@ -38,7 +40,9 @@ export function botCommand(g: Game): Command {
   if (city && countBuildings(g, g.current, true) < 4 && canAfford(g, COSTS.city)) return { type: 'city', id: best(g.vertices.filter(v => v.owner === g.current && !v.city), v => siteScore(g, v.id)).id };
   if (settlements.length && canAfford(g, COSTS.settlement)) return { type: 'settlement', id: best(settlements, id => siteScore(g, id)) };
   if (roads.length && canAfford(g, COSTS.road)) return { type: 'road', id: road() };
-  // Trade only toward a specific purchase; every trade decreases total cards.
+  const offer = botTradeProposal(g);
+  if (offer) return offer;
+  // After negotiations, use the bank toward a specific purchase.
   const targets = [city && countBuildings(g, g.current, true) < 4 ? COSTS.city : null, settlements.length ? COSTS.settlement : null, roads.length ? COSTS.road : null, g.deck.length ? COSTS.dev : null].filter(Boolean) as Partial<Record<Resource, number>>[];
   for (const cost of targets) {
     const missing = RESOURCES.find(r => p.hand[r] < (cost[r] || 0) && g.bank[r]);

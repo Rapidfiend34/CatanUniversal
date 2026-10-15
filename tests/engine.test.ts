@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, execute, RESOURCES, total, emptyHand, legalSettlements, legalRoads, points, longestLength, tradeRatio, COSTS, type Game, type Resource } from '../src/engine.ts';
 import { botCommand } from '../src/bot.ts';
+import { assessTrade, botTradeProposal } from '../src/trading.ts';
 
 function seeded(seed: number) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function fresh(n = 3, seed = 4) { return newGame(Array.from({ length: n }, (_, i) => ({ name: `Player ${i}`, bot: true })), seeded(seed)); }
@@ -80,13 +81,52 @@ test('winner is detected with secret victory cards on their own turn', () => {
   g=execute(g,{type:'road',id:legalRoads(g)[0]});assert.equal(g.phase,'finished');assert.equal(g.winner,0);assert.equal(points(g,0),10);assert.equal(points(g,0,false),2);
 });
 test('player trade conserves resources and rejects impossible offers', () => {
-  let g=started();g.phase='action';grant(g,'wood',1);grant(g,'ore',1,1);const give=emptyHand(),receive=emptyHand();give.wood=1;receive.ore=1;g=execute(g,{type:'offer',player:1,give,receive});balance(g);give.wood=20;assert.throws(()=>execute(g,{type:'offer',player:1,give,receive}));
+  let g=started();g.phase='action';grant(g,'wood',1);grant(g,'ore',1,1);const give=emptyHand(),receive=emptyHand();give.wood=1;receive.ore=1;const before=structuredClone(g);g=execute(g,{type:'offer',player:1,give,receive});
+  assert.deepEqual(g.players.map(p=>p.hand),before.players.map(p=>p.hand));assert(g.pendingTrade);
+  g=execute(g,{type:'respond',player:1,accept:true});assert.equal(g.players[0].hand.wood,before.players[0].hand.wood-1);assert.equal(g.players[1].hand.ore,before.players[1].hand.ore-1);assert.equal(g.pendingTrade,null);balance(g);give.wood=20;assert.throws(()=>execute(g,{type:'offer',player:1,give,receive}));
+});
+function tradingGame() {
+  const g=started();g.phase='action';g.players.forEach((p,i)=>{p.hand=emptyHand();p.bot=i!==0;});g.bank={wood:19,brick:19,sheep:19,wheat:19,ore:19};
+  grant(g,'ore',2,0);grant(g,'wood',3,1);grant(g,'wheat',2,1);grant(g,'ore',2,1);return g;
+}
+test('AI accepts a useful trade, rejects a harmful or unfunded trade, without changing hands', () => {
+  const g=tradingGame(),before=structuredClone(g),give=emptyHand(),receive=emptyHand();give.ore=1;receive.wood=1;
+  assert.equal(assessTrade(g,{from:0,to:1,give,receive}).accept,true);
+  assert.equal(assessTrade(g,{from:0,to:1,give:{...emptyHand(),wood:1},receive:{...emptyHand(),ore:1}}).accept,false);
+  assert.equal(assessTrade(g,{from:0,to:1,give:{...emptyHand(),ore:1},receive:{...emptyHand(),wood:2}}).accept,false);
+  assert.equal(assessTrade(g,{from:0,to:1,give:{...emptyHand(),ore:1},receive:{...emptyHand(),brick:1}}).accept,false);
+  assert.deepEqual(g,before);
+});
+test('offers pause actions, only the recipient may reply, and rejections are resource-neutral', () => {
+  let g=tradingGame();const before=structuredClone(g);g=execute(g,{type:'offer',player:1,give:{...emptyHand(),ore:1},receive:{...emptyHand(),wood:1}});
+  for(const cmd of [{type:'end'},{type:'roll'},{type:'buy'},{type:'trade',give:'wood',receive:'ore'},{type:'respond',player:2,accept:true}] as const)assert.throws(()=>execute(g,cmd));
+  assert.throws(()=>execute(g,{type:'offer',player:2,give:{...emptyHand(),ore:1},receive:{...emptyHand(),wood:1}}));
+  g=execute(g,{type:'respond',player:1,accept:false});assert.equal(g.pendingTrade,null);assert.equal(g.current,before.current);assert.equal(g.turn,before.turn);assert.deepEqual(g.players.map(p=>p.hand),before.players.map(p=>p.hand));assert.deepEqual(g.bank,before.bank);
+});
+test('unfunded requests can be declined but can never transfer resources', () => {
+  let g=tradingGame();g=execute(g,{type:'offer',player:1,give:{...emptyHand(),ore:1},receive:{...emptyHand(),brick:1}});
+  assert.throws(()=>execute(g,{type:'respond',player:1,accept:true}));assert.equal(assessTrade(g,g.pendingTrade!).accept,false);g=execute(g,botCommand(g));assert.equal(g.pendingTrade,null);balance(g);
+});
+test('AI proposes before bank trading, human consent is required and attempts are bounded', () => {
+  let g=tradingGame();g.current=1;const command=botCommand(g);assert.equal(command.type,'offer');if(command.type!=='offer')return;
+  assert.equal(command.player,0);assert.equal(command.receive.ore,1);const before=structuredClone(g);g=execute(g,command);assert.equal(g.pendingTrade?.to,0);assert.deepEqual(g.players.map(p=>p.hand),before.players.map(p=>p.hand));
+  const restored:Game=JSON.parse(JSON.stringify(g));g=execute(restored,{type:'respond',player:0,accept:true});balance(g);assert.equal(g.players[1].hand.ore,3);assert.equal(botCommand(g).type,'city');
+  assert.throws(()=>execute(g,command));assert.equal(botTradeProposal(g),null);g=execute(g,{type:'end'});assert.deepEqual(g.tradeAttempts,[]);
+});
+test('rejecting an AI proposal does not cause repeated offers or stall its turn', () => {
+  let g=tradingGame();g.current=1;g=execute(g,botCommand(g));assert(g.pendingTrade);g=execute(g,{type:'respond',player:0,accept:false});assert.equal(botTradeProposal(g),null);assert.equal(botCommand(g).type,'end');
+});
+test('AI proposal uses public board and hand sizes instead of hidden rival resource types', () => {
+  const g=tradingGame();g.current=1;const offer=botTradeProposal(g);assert(offer);const other=structuredClone(g);other.players[0].hand={...emptyHand(),sheep:2};other.players[0].dev.push({type:'victory',turn:0});assert.deepEqual(botTradeProposal(other),offer);
+});
+test('old saves without negotiation fields still play and resolve a new trade', () => {
+  let g=tradingGame();delete g.pendingTrade;delete g.tradeAttempts;g=execute(g,{type:'offer',player:1,give:{...emptyHand(),ore:1},receive:{...emptyHand(),wood:1}});g=execute(g,botCommand(g));assert.equal(g.pendingTrade,null);balance(g);
 });
 test('complete 3- and 4-player bot games reach victory while conserving all resources', () => {
   for(const [seed,n] of [[12,3],[41,3],[7,4],[28,4]]) {
-    const rng=seeded(seed);let g=newGame(Array.from({length:n},(_,i)=>({name:`AI ${i}`,bot:true})),rng),actions=0;
-    while(g.phase!=='finished'&&actions<12000){g=execute(g,botCommand(g),rng);balance(g);actions++;}
+    const rng=seeded(seed);let g=newGame(Array.from({length:n},(_,i)=>({name:`AI ${i}`,bot:true})),rng),actions=0,offers=0,accepted=0,rejected=0;
+    while(g.phase!=='finished'&&actions<12000){const cmd=botCommand(g);if(cmd.type==='offer')offers++;if(cmd.type==='respond'){if(cmd.accept)accepted++;else rejected++;}g=execute(g,cmd,rng);balance(g);actions++;}
     assert.equal(g.phase,'finished',`seed ${seed}, turn ${g.turn}, actions ${actions}`);assert(points(g,g.winner!)>=10);
-    console.log(`Simulation: ${n} players, seed ${seed}, ${g.turn} turns, ${actions} actions, winner ${g.winner}`);
+    assert(offers>0);assert(accepted>0);assert(rejected>0);console.log(`Simulation: ${n} players, seed ${seed}, ${g.turn} turns, ${actions} actions, ${offers} offers (${accepted} accepted, ${rejected} rejected), winner ${g.winner}`);
   }
 });
