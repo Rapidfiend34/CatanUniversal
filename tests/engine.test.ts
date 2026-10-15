@@ -44,6 +44,47 @@ test('seven requires exact discards and robber relocation before continuing', ()
   while(g.phase==='discard') g=execute(g,botCommand(g)); assert.equal(g.phase,'robber'); assert.throws(()=>execute(g,{type:'robber',tile:g.robber}));
   g=execute(g,botCommand(g)); if(g.phase==='steal')g=execute(g,botCommand(g));assert.equal(g.phase,'action');balance(g);
 });
+function robberyGame(multiple=false) {
+  const g=fresh();g.phase='robber';g.turn=2;g.setup=6;g.robber=0;g.resume='action';
+  const tile=g.tiles[9];g.vertices[tile.vertices[0]].owner=1;g.vertices[tile.vertices[4]].owner=0;
+  if(multiple)g.vertices[tile.vertices[2]].owner=2;
+  grant(g,'wood',2,0);grant(g,'ore',2,1);grant(g,'wheat',1,1);grant(g,'sheep',1,2);grant(g,'brick',1,2);
+  g.players[1].dev.push({type:'victory',turn:0});return g;
+}
+test('a lone eligible rival still requires an explicit hidden-card draw',()=>{
+  let g=robberyGame();const before=structuredClone(g);g=execute(g,{type:'robber',tile:9});
+  assert.equal(g.phase,'steal');assert.deepEqual(g.victims,[1]);assert.deepEqual(g.players,before.players);assert.deepEqual(g.bank,before.bank);
+  assert.throws(()=>execute(g,{type:'end'}));assert.throws(()=>execute(g,{type:'steal',player:2,card:0}));
+  g=execute(g,{type:'steal',player:1,card:1},seeded(22));assert.equal(g.phase,'action');assert.equal(total(g.players[0].hand),3);assert.equal(total(g.players[1].hand),2);assert.deepEqual(g.players[1].dev,before.players[1].dev);assert.deepEqual(g.players[2],before.players[2]);assert.deepEqual(g.bank,before.bank);balance(g);
+  assert.throws(()=>execute(g,{type:'steal',player:1,card:0}));
+});
+test('the chosen rival loses one resource and other affected rivals keep their cards',()=>{
+  let g=robberyGame(true);g=execute(g,{type:'robber',tile:9});assert.deepEqual(g.victims,[1,2]);const before=structuredClone(g);
+  g=execute(g,{type:'steal',player:2,card:0},seeded(3));assert.equal(total(g.players[2].hand),1);assert.deepEqual(g.players[1],before.players[1]);assert.equal(total(g.players[0].hand),3);assert.equal(g.phase,'action');balance(g);
+});
+test('invalid hidden-card slots and ineligible targets cannot change the game',()=>{
+  const g=execute(robberyGame(),{type:'robber',tile:9}),before=structuredClone(g);
+  for(const card of [-1,3,99,1.5,NaN])assert.throws(()=>execute(g,{type:'steal',player:1,card}));
+  assert.throws(()=>execute(g,{type:'steal',player:0,card:0}));assert.deepEqual(g,before);
+});
+test('card positions are shuffled and all positions can draw either resource',()=>{
+  const g=execute(robberyGame(),{type:'robber',tile:9});
+  for(const card of [0,1,2]){
+    let ore=0,wheat=0;
+    for(let seed=1;seed<=360;seed++){const next=execute(g,{type:'steal',player:1,card},seeded(seed));if(next.players[0].hand.ore===1)ore++;else if(next.players[0].hand.wheat===1)wheat++;else assert.fail('Must draw one of the victim’s resource cards');}
+    assert(ore>198&&ore<281,`ore draws at slot ${card}: ${ore}`);assert.equal(ore+wheat,360);
+  }
+});
+test('empty hands are ineligible even with development cards, and one rival is listed only once',()=>{
+  let g=robberyGame();for(const r of RESOURCES){g.bank[r]+=g.players[1].hand[r];g.players[1].hand[r]=0;}g=execute(g,{type:'robber',tile:9});assert.equal(g.phase,'action');assert.deepEqual(g.victims,[]);assert.match(g.log[0],/No hay rivales/);assert.equal(g.players[1].dev.length,1);
+  g=robberyGame();g.vertices[g.tiles[9].vertices[2]].owner=1;g.vertices[g.tiles[9].vertices[0]].city=true;g=execute(g,{type:'robber',tile:9});assert.deepEqual(g.victims,[1]);
+});
+test('a knight uses hidden-card selection and resumes the correct pre-dice or action phase',()=>{
+  for(const phase of ['roll','action'] as const){let g=robberyGame();g.phase=phase;g.players[0].dev=[{type:'knight',turn:0}];g=execute(g,{type:'dev',card:'knight'});assert.equal(g.phase,'robber');g=execute(g,{type:'robber',tile:9});assert.equal(g.phase,'steal');g=execute(g,{type:'steal',player:1,card:2},seeded(4));assert.equal(g.phase,phase);assert.equal(g.players[0].knights,1);balance(g);}
+});
+test('a pending robbery survives serialization and the AI can still draw automatically',()=>{
+  const g=execute(robberyGame(true),{type:'robber',tile:9});let restored:Game=JSON.parse(JSON.stringify(g));assert.equal(restored.phase,'steal');const cmd=botCommand(restored);assert.equal(cmd.type,'steal');restored=execute(restored,cmd,seeded(6));assert.equal(restored.phase,'action');balance(restored);
+});
 test('bank trade honors port ratios and rejects invalid or unavailable trades', () => {
   let g=started();g.phase='action'; for(const r of RESOURCES){g.bank[r]+=g.players[0].hand[r];g.players[0].hand[r]=0;}
   g.vertices.filter(v=>v.owner===0).forEach(v=>delete v.port); grant(g,'wood',4);assert.equal(tradeRatio(g,'wood'),4);

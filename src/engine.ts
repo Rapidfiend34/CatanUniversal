@@ -81,6 +81,9 @@ export function longestLength(g: Game, p: number): number {
 }
 export function points(g: Game, p: number, hidden = true): number { return g.vertices.filter(v => v.owner === p).reduce((n, v) => n + (v.city ? 2 : 1), 0) + (g.longest === p ? 2 : 0) + (g.army === p ? 2 : 0) + (hidden ? g.players[p].dev.filter(d => d.type === 'victory').length : 0); }
 export function tradeRatio(g: Game, r: Resource, p = g.current): number { const ports = g.vertices.filter(v => v.owner === p).map(v => v.port); return ports.includes(r) ? 2 : ports.includes('any') ? 3 : 4; }
+export function robberyVictims(g: Game, tile = g.robber): number[] {
+  return [...new Set(g.tiles[tile].vertices.map(v => g.vertices[v].owner).filter((i): i is number => i !== null && i !== g.current && total(g.players[i].hand) > 0))];
+}
 function awards(g: Game) {
   for (const kind of ['longest', 'army'] as const) {
     const scores = g.players.map((p, i) => kind === 'longest' ? longestLength(g, i) : p.knights), max = Math.max(...scores), candidates = scores.map((n, i) => n === max ? i : -1).filter(i => i >= 0);
@@ -89,7 +92,7 @@ function awards(g: Game) {
     else if (g[kind] === null || !candidates.includes(g[kind]!)) g[kind] = null;
   }
 }
-export type Command = { type: 'settlement' | 'city' | 'road'; id: number } | { type: 'roll' } | { type: 'end' } | { type: 'robber'; tile: number } | { type: 'steal'; player: number } | { type: 'discard'; player: number; cards: Hand } | { type: 'trade'; give: Resource; receive: Resource } | { type: 'offer'; player: number; give: Hand; receive: Hand } | { type: 'respond'; player: number; accept: boolean; reason?: string } | { type: 'buy' } | { type: 'dev'; card: Dev; resources?: Resource[] };
+export type Command = { type: 'settlement' | 'city' | 'road'; id: number } | { type: 'roll' } | { type: 'end' } | { type: 'robber'; tile: number } | { type: 'steal'; player: number; card?: number } | { type: 'discard'; player: number; cards: Hand } | { type: 'trade'; give: Resource; receive: Resource } | { type: 'offer'; player: number; give: Hand; receive: Hand } | { type: 'respond'; player: number; accept: boolean; reason?: string } | { type: 'buy' } | { type: 'dev'; card: Dev; resources?: Resource[] };
 export class RuleError extends Error {}
 const requireRule = (ok: unknown, message: string): void => { if (!ok) throw new RuleError(message); };
 export function validateTrade(g: Game, offer: TradeOffer, requireBothHands = false): void {
@@ -106,9 +109,12 @@ export function execute(state: Game, cmd: Command, rng = Math.random): Game {
   const pay = (cost: Partial<Hand>) => { requireRule(canAfford(g, cost), 'No tienes suficientes recursos.'); RESOURCES.forEach(r => { const n = cost[r] || 0; p.hand[r] -= n; g.bank[r] += n; }); };
   const action = () => requireRule(g.phase === 'action' && !g.freeRoads, 'Completa la acción pendiente primero.');
   const finishRobber = () => { g.phase = g.resume; g.victims = []; };
-  const steal = (victim: number) => {
+  const steal = (victim: number, card?: number) => {
     const pool = RESOURCES.flatMap(r => Array(g.players[victim].hand[r]).fill(r) as Resource[]);
-    if (pool.length) { const r = pool[Math.floor(rng() * pool.length)]; g.players[victim].hand[r]--; p.hand[r]++; }
+    requireRule(pool.length > 0 && (card === undefined || Number.isInteger(card) && card >= 0 && card < pool.length), 'Elige una carta boca abajo disponible.');
+    // Shuffle only at the draw so a slot never corresponds to a known resource order.
+    const r = card === undefined ? pool[Math.floor(rng() * pool.length)] : shuffle(pool, rng)[card];
+    g.players[victim].hand[r]--; p.hand[r]++;
     say(`${p.name} roba una carta a ${g.players[victim].name}.`); finishRobber();
   };
   switch (cmd.type) {
@@ -156,9 +162,9 @@ export function execute(state: Game, cmd: Command, rng = Math.random): Game {
     }
     case 'robber':
       requireRule(g.phase === 'robber' && g.tiles[cmd.tile] && cmd.tile !== g.robber, 'Mueve el ladrón a otra parcela.'); g.robber = cmd.tile;
-      g.victims = [...new Set(g.tiles[cmd.tile].vertices.map(v => g.vertices[v].owner).filter((i): i is number => i !== null && i !== g.current && total(g.players[i].hand) > 0))];
-      say(`${p.name} mueve el ladrón.`); if (!g.victims.length) finishRobber(); else if (g.victims.length === 1) steal(g.victims[0]); else g.phase = 'steal'; break;
-    case 'steal': requireRule(g.phase === 'steal' && g.victims.includes(cmd.player), 'Elige un rival junto al ladrón.'); steal(cmd.player); break;
+      g.victims = robberyVictims(g);
+      say(`${p.name} mueve el ladrón.`); if (!g.victims.length) { say('No hay rivales con cartas de recursos para robar en esta parcela.'); finishRobber(); } else g.phase = 'steal'; break;
+    case 'steal': requireRule(g.phase === 'steal' && g.victims.includes(cmd.player) && robberyVictims(g).includes(cmd.player), 'Elige un rival junto al ladrón.'); steal(cmd.player, cmd.card); break;
     case 'trade': {
       action(); const ratio = tradeRatio(g, cmd.give); requireRule(RESOURCES.includes(cmd.give) && RESOURCES.includes(cmd.receive) && cmd.give !== cmd.receive && p.hand[cmd.give] >= ratio && g.bank[cmd.receive] > 0, 'El banco no puede realizar ese intercambio.');
       p.hand[cmd.give] -= ratio; g.bank[cmd.give] += ratio; p.hand[cmd.receive]++; g.bank[cmd.receive]--; say(`${p.name} comercia con el banco (${ratio}:1).`); break;

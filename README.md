@@ -20,7 +20,7 @@ Las partidas se guardan automáticamente en `localStorage` después de cada acci
 - Tablero aleatorio de 19 hexágonos, 54 cruces y 72 tramos. Distribución estándar de terrenos y fichas de producción, sin 6 y 8 adyacentes.
 - Cinco recursos, banco finito de 19 cartas por recurso y producción con reglas de escasez.
 - Poblados, ciudades y carreteras con costes, conexión, distancia mínima e inventario de piezas: 5 poblados, 4 ciudades y 15 carreteras por participante.
-- Ladrón, descarte obligatorio con un 7 y robo aleatorio a un rival adyacente.
+- Ladrón, descarte obligatorio con un 7 y selección de una carta boca abajo de un rival adyacente.
 - Nueve puertos, comercio bancario 4:1, general 3:1 y especializado 2:1. Ofertas entre personas e IA con aceptación explícita.
 - Mazo estándar de 25 cartas: 14 caballeros, 5 puntos de victoria, 2 de carreteras, 2 de monopolio y 2 de abundancia. Restricciones de antigüedad y una carta jugada por turno.
 - Carretera más larga calculada como recorrido sin reutilizar aristas, interrupción por edificios rivales y conservación del titular en caso de empate. Mayor ejército y puntos secretos de desarrollo.
@@ -28,6 +28,12 @@ Las partidas se guardan automáticamente en `localStorage` después de cada acci
 - Escena procedural de Three.js: bosques, ovejas, montañas, campos, arcilla, poblados, ciudades, muelles, ladrón y océano animado. Todos los modelos se generan en código.
 
 El juego base utiliza **carreteras** terrestres. Los barcos, puentes y otras reglas de expansiones no están incluidos. Esta versión permite partidas completas locales; no incluye salas online, cuentas, servidor multijugador ni sincronización entre dispositivos. La IA es heurística, no un jugador experto. No hay comercio antes de lanzar los dados.
+
+## Robo del ladrón
+
+Después de mover el ladrón, se abre la selección de robo si hay rivales con un poblado o una ciudad adyacente y al menos una carta de recurso. Si hay varios, eliges a cuál robar; si solo hay uno, se muestra directamente su mano boca abajo. Pulsa una de sus cartas para completar el robo: mover el ladrón o elegir al rival no transfiere cartas automáticamente.
+
+Solo se muestra la cantidad de cartas de recursos y sus reversos, sin indicar sus tipos. Las posiciones se barajan al realizar el robo y todas tienen la misma probabilidad de contener cada carta. Las cartas de desarrollo están excluidas. Si nadie es elegible, aparece una explicación y el turno continúa. Este mismo flujo se aplica a los caballeros, conservando la fase de dados cuando se juegan antes de lanzar. Si recargas durante un robo pendiente, la selección vuelve a abrirse.
 
 ## Intercambios con la IA
 

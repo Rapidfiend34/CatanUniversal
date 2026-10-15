@@ -1,6 +1,6 @@
 import './style.css';
 import { Board, type Mode } from './board';
-import { type Game, type Command, type Hand, type Dev, type Resource, newGame, execute, RESOURCES, NAMES, DEV_NAMES, COSTS, COLORS, total, points, legalRoads, legalSettlements, longestLength, tradeRatio, canAfford, countBuildings, emptyHand, validateTrade } from './engine';
+import { type Game, type Command, type Hand, type Dev, type Resource, newGame, execute, RESOURCES, NAMES, DEV_NAMES, COSTS, COLORS, total, points, legalRoads, legalSettlements, longestLength, tradeRatio, canAfford, countBuildings, emptyHand, validateTrade, robberyVictims } from './engine';
 import { botCommand } from './bot';
 import { icon } from './icons';
 
@@ -9,6 +9,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt
 let game: Game;
 try { const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); validateSave(saved); game = saved; } catch { game = newGame([{ name: 'Tú', bot: false }, { name: 'Olivia', bot: true }, { name: 'Nicolás', bot: true }]); }
 let mode: Mode = 'inspect', muted = true, activeModal = '', botTimer = 0, toastTimer = 0, passTo: number | null = null;
+let selectedVictim: number | null = null;
 let audio: AudioContext | null = null;
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `
@@ -46,6 +47,8 @@ function isHuman() { return !game.players[game.current].bot && passTo === null &
 function dispatch(command: Command, automated = false) {
   try {
     const old = game.current, previousOffer = game.pendingTrade; game = execute(game, command); mode = 'inspect';
+    if (command.type === 'robber') { selectedVictim = null; if (!automated && game.phase !== 'steal') toast('No hay rivales con cartas de recursos para robar en esta parcela.'); }
+    if (command.type === 'steal') { selectedVictim = null; if (activeModal === 'robbery') closeModal(); if (!automated) toast(game.log[0]); }
     if (command.type === 'respond') { if (activeModal === 'offer-pending') closeModal(); if (previousOffer && (!game.players[previousOffer.from].bot || !game.players[previousOffer.to].bot)) toast(game.log[0]); }
     if (command.type === 'road' || command.type === 'settlement' || command.type === 'city') sound('build'); else if (command.type === 'roll') sound('dice');
     if (!automated && command.type === 'end' || old !== game.current) { if (!game.players[game.current].bot && game.players.filter(p => !p.bot).length > 1 && old !== game.current) passTo = game.current; }
@@ -64,7 +67,7 @@ function phaseText() {
   if (game.phase === 'roll') return { tag: `TURNO ${game.turn} · ${name.toUpperCase()}`, title: 'La suerte está echada.', text: 'Lanza los dados para producir recursos. Después podrás comerciar y construir.' };
   if (game.phase === 'discard') return { tag: 'HA SALIDO UN 7', title: 'Viaja más ligero.', text: 'Quien tenga más de 7 recursos debe devolver la mitad al banco (redondeando hacia abajo).' };
   if (game.phase === 'robber') return { tag: 'EL LADRÓN SE MUEVE', title: 'Cambia las reglas.', text: `${name}, elige otra parcela: bloquearás su producción y podrás robar una carta a un rival.` };
-  if (game.phase === 'steal') return { tag: 'ELIGE A TU RIVAL', title: 'Una pequeña ventaja.', text: 'Selecciona a quién robar una carta de recurso al azar.' };
+  if (game.phase === 'steal') return { tag: 'UNA CARTA, UNA OPORTUNIDAD', title: 'Una pequeña ventaja.', text: 'Elige un rival afectado por el ladrón y una de sus cartas boca abajo.' };
   if (game.freeRoads) return { tag: `CARRETERAS GRATUITAS · ${game.freeRoads}`, title: 'Abre nuevos caminos.', text: 'Elige un tramo iluminado. Estas carreteras no cuestan recursos.' };
   if (mode !== 'inspect') return { tag: 'CONSTRUCCIÓN', title: mode === 'road' ? 'Un camino por recorrer.' : mode === 'city' ? 'Tu isla crece contigo.' : 'Un lugar para quedarse.', text: 'Selecciona una ubicación iluminada en el tablero para construir.' };
   return { tag: `TURNO ${game.turn} · ${name.toUpperCase()}`, title: 'Haz crecer tu isla.', text: 'Construye, intercambia recursos o descubre una carta. Cada decisión cuenta.' };
@@ -90,11 +93,12 @@ function render() {
       }).join('')}<button class="trade-button" data-act="trade" ${actionable ? '' : 'disabled'}>${icon('trade', 20)}<span>Comerciar</span></button></div>
     </div>
     <div class="turn-panel"><div class="dice-area">${g.dice ? g.dice.map(n => `<div class="die" aria-label="Dado ${n}">${Array.from({ length: 9 }, (_, i) => `<i class="${diceDots(n).includes(i) ? 'dot' : ''}"></i>`).join('')}</div>`).join('') : `<div class="die waiting">${icon('dice', 28)}</div><div class="die waiting">${icon('dice', 28)}</div>`}<span class="dice-total">${g.dice ? g.dice[0] + g.dice[1] : '–'}<small>${g.dice ? 'RESULTADO' : 'DADOS'}</small></span></div>
-      <button class="primary-button turn-button" data-act="${g.phase === 'finished' ? 'results' : g.phase === 'roll' ? 'roll' : g.phase === 'action' ? 'end' : 'locations'}" ${human && (g.phase === 'roll' || actionable || ['setup-settlement', 'setup-road', 'robber'].includes(g.phase) || g.freeRoads) || g.phase === 'finished' ? '' : 'disabled'}>${g.phase === 'finished' ? 'Ver resultados' : !human ? 'Turno del rival…' : g.phase === 'roll' ? 'Lanzar dados' : g.phase === 'action' && !g.freeRoads ? 'Terminar turno' : 'Elegir ubicación'} ${icon(g.phase === 'roll' ? 'dice' : 'arrow', 18)}</button><span class="turn-hint">${g.phase.startsWith('setup') ? 'Colocación inicial · Sin coste' : g.phase === 'roll' ? 'Que la isla esté de tu lado.' : 'Lo que construyes, permanece.'}</span>
+      <button class="primary-button turn-button" data-act="${g.phase === 'finished' ? 'results' : g.phase === 'roll' ? 'roll' : g.phase === 'steal' ? 'robbery' : g.phase === 'action' ? 'end' : 'locations'}" ${human && (g.phase === 'roll' || actionable || ['setup-settlement', 'setup-road', 'robber', 'steal'].includes(g.phase) || g.freeRoads) || g.phase === 'finished' ? '' : 'disabled'}>${g.phase === 'finished' ? 'Ver resultados' : !human ? 'Turno del rival…' : g.phase === 'roll' ? 'Lanzar dados' : g.phase === 'steal' ? 'Elegir carta' : g.phase === 'action' && !g.freeRoads ? 'Terminar turno' : 'Elegir ubicación'} ${icon(g.phase === 'roll' ? 'dice' : 'arrow', 18)}</button><span class="turn-hint">${g.phase.startsWith('setup') ? 'Colocación inicial · Sin coste' : g.phase === 'roll' ? 'Que la isla esté de tu lado.' : 'Lo que construyes, permanece.'}</span>
     </div>`;
   board?.update(g, mode, human);
   if (passTo !== null) showPass();
   else if (g.pendingTrade && (!g.players[g.pendingTrade.from].bot || !g.players[g.pendingTrade.to].bot)) showPendingTrade();
+  else if (g.phase === 'steal' && human) showRobbery();
   else if (g.phase === 'discard' && !g.players[g.discards.findIndex(Boolean)]?.bot) showDiscard();
   else if (g.phase === 'finished' && activeModal !== 'results') showResults();
 }
@@ -147,6 +151,14 @@ function showDiscard() {
   const i = game.discards.findIndex(Boolean); if (i < 0) return;
   modal('discard', `${esc(game.players[i].name)}, aligera tu equipaje.`, `Devuelve exactamente ${game.discards[i]} recursos al banco. Pasa el dispositivo a este jugador.`, `<form id="discard-form" data-player="${i}"><div class="resource-inputs">${RESOURCES.map(r => `<label>${resourceIcon(r)}<span>${NAMES[r]}<small>Tienes ${game.players[i].hand[r]}</small></span><input type="number" name="${r}" min="0" max="${game.players[i].hand[r]}" value="0" required></label>`).join('')}</div><button class="primary-button full" type="submit">Devolver recursos ${icon('arrow', 18)}</button></form>`, false, true);
 }
+function showRobbery() {
+  if (game.phase !== 'steal' || !isHuman()) return;
+  if (selectedVictim === null || !game.victims.includes(selectedVictim)) selectedVictim = game.victims.length === 1 ? game.victims[0] : null;
+  const victim = selectedVictim === null ? null : game.players[selectedVictim], count = victim ? total(victim.hand) : 0;
+  modal('robbery', victim ? `Elige una carta de ${esc(victim.name)}.` : 'Elige a quién robar.', 'Solo puedes robar a rivales con un poblado o ciudad junto al ladrón y cartas de recursos en su mano.', `
+    <div class="robbery-victims" role="group" aria-label="Rivales afectados por el ladrón">${game.victims.map(i => `<button class="robbery-victim ${selectedVictim === i ? 'selected' : ''}" data-victim="${i}" aria-pressed="${selectedVictim === i}" style="--player:${game.players[i].color}"><span class="robbery-avatar">${icon(game.players[i].bot ? 'bot' : 'person', 22)}</span><span><strong>${esc(game.players[i].name)}</strong><small>${total(game.players[i].hand)} cartas de recursos</small></span>${icon('arrow', 16)}</button>`).join('')}</div>
+    ${victim ? `<div class="robbery-hand" role="group" aria-label="Cartas boca abajo de ${esc(victim.name)}">${Array.from({ length: count }, (_, i) => `<button class="hidden-card" data-steal-card="${i}" aria-label="Robar carta oculta ${i + 1} de ${esc(victim.name)}"><span class="card-back-art">${icon('island', 28)}<span>ISLA</span></span><small>${i + 1}</small></button>`).join('')}</div><p class="robbery-note">${icon('dev', 17)} Toca una carta boca abajo. Su recurso no se revela antes de elegir; las cartas de desarrollo no se pueden robar.</p>` : '<p class="robbery-note">Selecciona un rival para ver sus cartas boca abajo. Ninguna carta se robará hasta que la elijas.</p>'}`, count > 8, true);
+}
 function showTrade() {
   if (!isHuman() || game.phase !== 'action' || game.freeRoads) return;
   const opts = RESOURCES.map(r => `<option value="${r}">${NAMES[r]}</option>`).join('');
@@ -186,19 +198,21 @@ function showResults() { if (game.winner === null) return; const w = game.player
 function showSettings() { modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `<div class="settings-actions"><button class="setting-row" data-act="sound">${icon('sound', 23)}<span>Sonidos sutiles<small>${muted ? 'Desactivados' : 'Activados'}</small></span><b>${muted ? 'Activar' : 'Silenciar'}</b></button><button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. El modo online y las expansiones no forman parte de esta versión.</p>`); }
 
 app.addEventListener('click', e => {
-  const button = (e.target as HTMLElement).closest<HTMLElement>('[data-act], [data-build], [data-location], [data-victim], [data-dev], [data-trade-tab]');
+  const button = (e.target as HTMLElement).closest<HTMLElement>('[data-act], [data-build], [data-location], [data-victim], [data-steal-card], [data-dev], [data-trade-tab]');
   if (!button || button.hasAttribute('disabled')) return;
   sound();
   if (button.dataset.build) { const kind = button.dataset.build; if (kind === 'dev') dispatch({ type: 'buy' }); else { mode = kind as Mode; render(); } return; }
   if (button.dataset.location) { const id = Number(button.dataset.location), kind = button.dataset.kind!; closeModal(); selectBoard(kind, id); return; }
-  if (button.dataset.victim) { dispatch({ type: 'steal', player: Number(button.dataset.victim) }); return; }
+  if (button.dataset.victim) { const id = Number(button.dataset.victim); if (game.phase === 'steal' && isHuman() && game.victims.includes(id)) { selectedVictim = id; showRobbery(); } return; }
+  if (button.dataset.stealCard !== undefined) { if (selectedVictim !== null && isHuman()) dispatch({ type: 'steal', player: selectedVictim, card: Number(button.dataset.stealCard) }); return; }
   if (button.dataset.dev) { playDev(button.dataset.dev as Dev); return; }
   if (button.dataset.tradeTab) { const bank = button.dataset.tradeTab === 'bank'; document.querySelector<HTMLFormElement>('#trade-form')!.hidden = !bank; document.querySelector<HTMLFormElement>('#offer-form')!.hidden = bank; document.querySelectorAll('[data-trade-tab]').forEach(b => b.classList.toggle('active', b === button)); return; }
   switch (button.dataset.act) {
     case 'help': showHelp(); break;
     case 'new': showNew(); break;
     case 'settings': showSettings(); break;
-    case 'close-modal': if (passTo === null && game.phase !== 'discard' && !game.pendingTrade) closeModal(); break;
+    case 'close-modal': if (passTo === null && game.phase !== 'discard' && game.phase !== 'steal' && !game.pendingTrade) closeModal(); break;
+    case 'robbery': showRobbery(); break;
     case 'close-tile': document.querySelector<HTMLElement>('#tile-info')!.hidden = true; break;
     case 'cancel-build': mode = 'inspect'; render(); break;
     case 'roll': dispatch({ type: 'roll' }); break;
@@ -233,7 +247,7 @@ app.addEventListener('change', async e => {
   const target = e.target as HTMLInputElement;
   if (target.closest('#trade-form')) updateRatio();
   if (target.id === 'import-game' && target.files?.[0]) {
-    try { const file = target.files[0]; if (file.size > 1_000_000) throw new Error('Archivo demasiado grande.'); const next: Game = JSON.parse(await file.text()); validateSave(next); window.clearTimeout(botTimer); game = next; passTo = null; mode = 'inspect'; closeModal(); board?.create(game); save(); render(); scheduleBot(); toast('Partida recuperada. ¡Bienvenido de nuevo!'); }
+    try { const file = target.files[0]; if (file.size > 1_000_000) throw new Error('Archivo demasiado grande.'); const next: Game = JSON.parse(await file.text()); validateSave(next); window.clearTimeout(botTimer); game = next; passTo = null; selectedVictim = null; mode = 'inspect'; closeModal(); board?.create(game); save(); render(); scheduleBot(); toast('Partida recuperada. ¡Bienvenido de nuevo!'); }
     catch { toast('El archivo no contiene una partida válida de Isla Universal.'); }
   }
 });
@@ -249,9 +263,10 @@ function validateSave(g: Game) {
   for (const [i, t] of g.tiles.entries()) if (t.id !== i || !Number.isFinite(t.x) || !Number.isFinite(t.z) || ![...RESOURCES, 'desert'].includes(t.resource) || !t.vertices.every(v => !!g.vertices[v])) throw new Error('Invalid graph');
   if (g.tradeAttempts !== undefined && (!Array.isArray(g.tradeAttempts) || g.tradeAttempts.length > g.players.length - 1 || new Set(g.tradeAttempts).size !== g.tradeAttempts.length || !g.tradeAttempts.every(i => Number.isInteger(i) && !!g.players[i] && i !== g.current))) throw new Error('Invalid trade attempts');
   if (g.pendingTrade !== undefined && g.pendingTrade !== null) { if (g.phase !== 'action' || g.freeRoads) throw new Error('Invalid pending trade phase'); validateTrade(g, g.pendingTrade); }
+  if (g.phase === 'steal') { const eligible = robberyVictims(g); if (!eligible.length || new Set(g.victims).size !== g.victims.length || eligible.length !== g.victims.length || !eligible.every(i => g.victims.includes(i))) throw new Error('Invalid robbery victims'); }
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && passTo === null && game.phase !== 'discard' && !game.pendingTrade) { closeModal(); mode = 'inspect'; render(); }
+  if (e.key === 'Escape' && passTo === null && game.phase !== 'discard' && game.phase !== 'steal' && !game.pendingTrade) { closeModal(); mode = 'inspect'; render(); }
   if (e.key === 'Tab' && activeModal) { const root = document.querySelector('.modal')!; const elements = [...root.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([hidden]), select, [tabindex="0"]')].filter(el => el.offsetParent !== null); const first = elements[0], last = elements.at(-1); if (e.shiftKey && (document.activeElement === first || document.activeElement === root)) { e.preventDefault(); last?.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); } }
 });
 // A read-only diagnostic surface also enables real pointer-based browser tests.

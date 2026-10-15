@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { newGame, execute, legalSettlements, legalRoads, emptyHand, RESOURCES, type Game } from '../src/engine';
+import { newGame, execute, legalSettlements, legalRoads, emptyHand, RESOURCES, total, type Game } from '../src/engine';
 import { botCommand } from '../src/bot';
 
 const state = (page: Page): Promise<Game> => page.evaluate(() => (window as any).__isla.state);
@@ -13,6 +13,12 @@ async function pickLocation(page: Page) {
   await page.locator('[data-act="locations"]').first().click();
   await page.locator('.location-row').first().click();
 }
+async function chooseRobberyCard(page: Page) {
+  if ((await state(page)).phase !== 'steal') return;
+  const dialog=page.getByRole('dialog');
+  if (!await dialog.locator('[data-steal-card]').count()) await dialog.locator('[data-victim]').first().click();
+  await dialog.locator('[data-steal-card]').first().click();
+}
 async function importGame(page: Page, g: Game, dialogExpected = false) {
   await page.getByRole('button', { name: 'Opciones de partida' }).click();
   await page.locator('#import-game').setInputFiles({ name: 'partida.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(g)) });
@@ -25,6 +31,14 @@ function aiTradingGame() {
   for(const r of RESOURCES)g.bank[r]=19-g.players.reduce((n,p)=>n+p.hand[r],0);
   return g;
 }
+function robberyGame(multiple=false){
+  const g=setupGame();g.phase='robber';g.current=0;g.turn=2;g.dice=[3,4];g.resume='action';g.robber=0;
+  g.vertices.forEach(v=>{v.owner=null;v.city=false;});g.edges.forEach(e=>e.owner=null);
+  const t=g.tiles[9];g.vertices[t.vertices[0]].owner=1;g.vertices[t.vertices[4]].owner=0;if(multiple)g.vertices[t.vertices[2]].owner=2;
+  g.players[0].hand={...emptyHand(),wood:2};g.players[1].hand={...emptyHand(),ore:2,wheat:1};g.players[2].hand={...emptyHand(),sheep:1,brick:1};g.players[1].dev=[{type:'victory',turn:0}];
+  for(const r of RESOURCES)g.bank[r]=19-g.players.reduce((n,p)=>n+p.hand[r],0);return g;
+}
+async function moveRobber(page:Page){await page.locator('[data-act="locations"]').first().click();await page.getByRole('dialog').locator('[data-location="9"]').click();}
 
 test('3D canvas renders, real pointer builds a settlement, road selection persists', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
@@ -60,7 +74,7 @@ test('complete local setup, privacy curtain, roll, end turn and help', async ({ 
   await page.getByRole('button', { name: 'Lanzar dados' }).click();
   let g = await state(page);
   if (g.phase === 'discard') throw new Error('Initial hands cannot need discards');
-  if (g.phase === 'robber') { await pickLocation(page); g = await state(page); if (g.phase === 'steal') await page.locator('[data-victim]').first().click(); }
+  if (g.phase === 'robber') { await pickLocation(page); await chooseRobberyCard(page); }
   await page.getByRole('button', { name: 'Terminar turno' }).click();
   await expect(page.getByRole('dialog')).toContainText('Turno de Jugador 2');
   await page.getByRole('button', { name: 'Estoy listo' }).click();
@@ -135,7 +149,7 @@ test('mandatory discard, robber movement and stolen resource resolve in the UI',
   await expect(page.getByRole('dialog')).toContainText('aligera tu equipaje');
   const required=g.discards[0];await page.locator('#discard-form [name="wood"]').fill(String(required));
   await page.getByRole('button',{name:'Devolver recursos'}).click();expect((await state(page)).phase).toBe('robber');
-  await pickLocation(page);g=await state(page);if(g.phase==='steal')await page.locator('[data-victim]').first().click();
+  await pickLocation(page);await chooseRobberyCard(page);
   expect((await state(page)).phase).toBe('action');await expect(page.getByRole('button',{name:'Terminar turno'})).toBeEnabled();
 });
 
@@ -190,4 +204,50 @@ test('AI-to-AI trades resolve automatically and an unaffordable human offer can 
   unfunded=execute(unfunded,{type:'offer',player:0,give:{...emptyHand(),wood:1},receive:{...emptyHand(),brick:1}});
   await importGame(page,unfunded,true);await expect(page.getByRole('button',{name:'Aceptar intercambio'})).toBeDisabled();
   await page.getByRole('button',{name:'Rechazar oferta'}).click();expect((await state(page)).pendingTrade).toBeNull();
+});
+
+test('seven shows the lone rival’s resource cards face down and waits for a card click',async({page})=>{
+  await page.goto('/');const g=robberyGame();await importGame(page,g);await moveRobber(page);
+  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('Elige una carta de Mateo');
+  await expect(dialog.locator('[data-steal-card]')).toHaveCount(3);
+  await expect(dialog).not.toContainText(/Madera|Arcilla|Lana|Trigo|Mineral/);
+  for(const button of await dialog.locator('[data-steal-card]').all()){expect(await button.getAttribute('data-resource')).toBeNull();expect(await button.getAttribute('title')).toBeNull();}
+  expect((await state(page)).players).toEqual(g.players);await page.waitForTimeout(1000);expect((await state(page)).phase).toBe('steal');
+  await page.screenshot({path:'test-results/robbery-hidden-cards.png'});
+  await dialog.getByRole('button',{name:'Robar carta oculta 2 de Mateo',exact:true}).click();
+  const after=await state(page);expect(after.phase).toBe('action');expect(total(after.players[0].hand)).toBe(3);expect(total(after.players[1].hand)).toBe(2);expect(after.players[1].dev).toEqual(g.players[1].dev);expect(after.players[2]).toEqual(g.players[2]);expect(after.bank).toEqual(g.bank);
+  await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'Terminar turno'})).toBeEnabled();
+});
+
+test('with multiple affected rivals, choosing a rival does not yet steal a card',async({page})=>{
+  await page.goto('/');const g=robberyGame(true);await importGame(page,g);await moveRobber(page);
+  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('Elige a quién robar');await expect(dialog.locator('[data-steal-card]')).toHaveCount(0);
+  await dialog.locator('[data-victim="1"]').click();await expect(dialog.locator('[data-steal-card]')).toHaveCount(3);expect((await state(page)).players).toEqual(g.players);
+  await dialog.locator('[data-victim="2"]').click();await expect(dialog.locator('[data-steal-card]')).toHaveCount(2);expect((await state(page)).players).toEqual(g.players);
+  await dialog.locator('[data-steal-card="1"]').click();const after=await state(page);expect(after.players[1]).toEqual(g.players[1]);expect(total(after.players[2].hand)).toBe(1);expect(total(after.players[0].hand)).toBe(3);expect(after.log[0]).toContain('Eva');
+});
+
+test('pending robbery is restored on reload and cannot be skipped with Escape',async({page})=>{
+  await page.goto('/');const g=robberyGame(true);await importGame(page,g);await moveRobber(page);await page.getByRole('dialog').locator('[data-victim="2"]').click();
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toBeVisible();await page.reload();
+  await expect(page.getByRole('dialog')).toContainText('Elige a quién robar');expect((await state(page)).players).toEqual(g.players);
+  await chooseRobberyCard(page);expect((await state(page)).phase).toBe('action');
+});
+
+test('knight before dice opens hidden cards and returns to the required dice roll',async({page})=>{
+  await page.goto('/');const g=robberyGame();g.phase='roll';g.dice=null;g.players[0].dev=[{type:'knight',turn:0}];await importGame(page,g);
+  await page.locator('[data-act="cards"]').click();await page.locator('[data-dev="knight"]').click();expect((await state(page)).phase).toBe('robber');
+  await moveRobber(page);await page.getByRole('dialog').locator('[data-steal-card="0"]').click();expect((await state(page)).phase).toBe('roll');await expect(page.getByRole('button',{name:'Lanzar dados'})).toBeEnabled();
+});
+
+test('no resource-bearing rivals means no robbery dialog and an explicit explanation',async({page})=>{
+  await page.goto('/');const g=robberyGame();for(const r of RESOURCES){g.bank[r]+=g.players[1].hand[r];g.players[1].hand[r]=0;}await importGame(page,g);await moveRobber(page);
+  await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.locator('#toast')).toContainText('No hay rivales con cartas de recursos');expect((await state(page)).phase).toBe('action');expect((await state(page)).players[1].dev).toEqual(g.players[1].dev);
+});
+
+test('face-down resource card selection is usable on mobile',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await page.goto('/');const g=robberyGame();
+  await page.getByRole('button',{name:'Ajustes',exact:true}).click();await page.locator('#import-game').setInputFiles({name:'robbery.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(g))});
+  await moveRobber(page);const card=page.getByRole('dialog').getByRole('button',{name:'Robar carta oculta 3 de Mateo'});await expect(card).toBeInViewport();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/robbery-mobile.png'});await card.click();expect((await state(page)).phase).toBe('action');
 });
