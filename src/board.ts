@@ -59,7 +59,7 @@ export class Board {
       const hit = this.pick(e); if (hit) this.onSelect(hit.userData.kind, hit.userData.id);
     });
     host.addEventListener('pointermove', e => { const hit = this.pick(e); this.hovered = hit; host.style.cursor = hit ? 'pointer' : 'grab'; });
-    const frame = (t: number) => { this.animation = requestAnimationFrame(frame); this.sea.uniforms.uTime.value = t / 1000; this.controls.update(); this.targets.children.forEach(c => { const m = c as THREE.Mesh; if (m.material instanceof THREE.MeshStandardMaterial) m.material.emissiveIntensity = c === this.hovered ? .65 : .18 + Math.sin(t / 550) * .08; }); this.renderer.render(this.scene, this.camera); }; frame(0);
+    const frame = (t: number) => { this.animation = requestAnimationFrame(frame); if (document.hidden || !this.host.clientWidth || !this.host.clientHeight) return; this.sea.uniforms.uTime.value = t / 1000; this.controls.update(); this.targets.children.forEach(c => { const m = c as THREE.Mesh; if (m.material instanceof THREE.MeshStandardMaterial) m.material.emissiveIntensity = c === this.hovered ? .65 : .18 + Math.sin(t / 550) * .08; }); this.renderer.render(this.scene, this.camera); }; frame(0);
   }
   private resize() { const w = this.host.clientWidth, h = this.host.clientHeight; if (!w || !h) return; const aspect = w / h, height = aspect < 1 ? 6.9 / aspect : 6.5; this.camera.left = -height * aspect; this.camera.right = height * aspect; this.camera.top = height; this.camera.bottom = -height; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); }
   private pick(e: PointerEvent): THREE.Object3D | null {
@@ -126,7 +126,7 @@ export class Board {
     }
     this.update(g, 'inspect', true);
   }
-  update(g: Game, mode: Mode, interactive: boolean) {
+  update(g: Game, mode: Mode, interactive: boolean, numbered = false) {
     this.lastGame = g; this.lastMode = mode; this.disposeGroup(this.pieces); this.disposeGroup(this.targets);
     for (const e of g.edges) if (e.owner !== null) {
       const a = g.vertices[e.a], b = g.vertices[e.b];
@@ -158,6 +158,10 @@ export class Board {
     } else if (kind === 'settlement' || kind === 'city') {
       const ids = kind === 'settlement' ? legalSettlements(g) : g.vertices.filter(v => v.owner === g.current && !v.city).map(v => v.id);
       for (const id of ids) { const v = g.vertices[id]; const m = this.mesh(new THREE.CylinderGeometry(.15, .15, .035, 24), new THREE.MeshStandardMaterial({ color: '#fff0c5', emissive: '#abc78e' }), this.targets, v.x, kind === 'city' ? .92 : .46, v.z); m.userData = { kind, id }; }
+    }
+    if (numbered) for (const target of [...this.targets.children]) {
+      const canvas = document.createElement('canvas'); canvas.width = 96; canvas.height = 64; const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#fff9e5'; ctx.beginPath(); ctx.roundRect(2, 2, 92, 60, 12); ctx.fill(); ctx.fillStyle = '#31533f'; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(target.userData.id + 1), 48, 44);
+      const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace; const label = new THREE.Sprite(new THREE.SpriteMaterial({ map, depthTest: false })); label.position.copy(target.position); label.position.y += .18; label.scale.set(.32, .22, 1); label.userData = { ...target.userData }; this.targets.add(label);
     }
   }
   home() { this.camera.position.set(10, 13, 13); this.controls.target.set(0, 0, 0); this.camera.zoom = 1; this.camera.updateProjectionMatrix(); this.controls.update(); }

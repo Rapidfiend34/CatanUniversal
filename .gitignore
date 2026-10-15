@@ -4,3 +4,8 @@ test-results/
 playwright-report/
 *.local
 .DS_Store
+.isla-rooms/
+.vercel/
+.env
+.env.*
+!.env.example

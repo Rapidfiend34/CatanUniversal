@@ -1,4 +1,4 @@
-import { type Game, type Hand, type TradeOffer, type Command, RESOURCES, COSTS, emptyHand, total, points, legalRoads, legalSettlements, countBuildings, tradeRatio, validateTrade } from './engine';
+import { type Game, type Hand, type TradeOffer, type Command, RESOURCES, COSTS, emptyHand, total, points, legalRoads, legalSettlements, countBuildings, tradeRatio, validateTrade } from './engine.js';
 
 interface Target { cost: Partial<Hand>; priority: number }
 export function tradeTargets(g: Game, player: number): Target[] {

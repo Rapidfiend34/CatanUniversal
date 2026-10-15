@@ -1,5 +1,5 @@
-import { type Game, type Command, type Resource, RESOURCES, COSTS, canAfford, legalSettlements, legalRoads, countBuildings, tradeRatio, emptyHand, points } from './engine';
-import { assessTrade, botTradeProposal } from './trading';
+import { type Game, type Command, type Resource, RESOURCES, COSTS, canAfford, legalSettlements, legalRoads, countBuildings, tradeRatio, emptyHand, points } from './engine.js';
+import { assessTrade, botTradeProposal } from './trading.js';
 
 export function siteScore(g: Game, id: number, p = g.current): number {
   const v = g.vertices[id];

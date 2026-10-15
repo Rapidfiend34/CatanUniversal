@@ -4,7 +4,22 @@ Juego de estrategia de mesa con tablero 3D isométrico, interfaz en español y u
 
 ## Jugar
 
-La partida inicial te enfrenta a dos rivales automáticos. Pulsa **Nueva partida** para elegir tu nombre, 3 o 4 participantes y jugar contra la IA o con personas compartiendo el dispositivo.
+La partida inicial te enfrenta a dos rivales automáticos. Pulsa **Nueva partida** para elegir tu nombre, 3 o 4 participantes y jugar contra la IA o con personas compartiendo el dispositivo. **Salas online** abre los modos Online y Party.
+
+### Online con amigos
+
+1. Abre https://isla-universal.vercel.app/, pulsa **Salas online → Online** y crea una sala de 3 o 4 plazas.
+2. Comparte el código de siete caracteres, el enlace de invitación o su QR. Tus amigos entran desde sus propios navegadores con su nombre.
+3. Todos los jugadores pulsan **Estoy listo**. El anfitrión pulsa **Empezar partida**. Se necesitan dos personas como mínimo; las plazas restantes se completan con IA.
+4. Cada participante ve su propia mano y puede actuar cuando le corresponda. Las ofertas llegan al destinatario y los descartes se eligen desde el dispositivo de cada afectado.
+
+### Party: televisión y mandos móviles
+
+Abre el juego en el navegador de la televisión, o conecta un ordenador por HDMI o duplicación de pantalla. Selecciona **Salas online → Party · TV**. Esa pantalla queda como tablero público y no ocupa plaza de jugador. Los participantes escanean el QR o introducen el código desde sus móviles; incluso el anfitrión entra como jugador desde otro navegador/dispositivo.
+
+Los móviles muestran las cartas privadas y los controles de turno. **Elegir ubicación** permite seleccionar cruces y tramos cuyos números aparecen en la televisión; **Ver tablero** permite consultar también el tablero 3D en el móvil. La TV ofrece pantalla completa. Todos los dispositivos necesitan internet; pueden estar en redes diferentes. No hace falta instalar aplicaciones.
+
+Las salas caducan 48 horas después de crearse. Recarga el mismo navegador con el enlace de la sala para recuperar tu plaza: el acceso se conserva en ese navegador, no en el código público. No borres los datos del sitio ni cambies a otro navegador durante una partida. Tras empezar, no se admiten nuevos jugadores. Si alguien se desconecta, la partida espera sus acciones; no hay sustitución automática ni migración del anfitrión.
 
 1. Selecciona un cruce iluminado para fundar un poblado y después un tramo contiguo para su carretera gratuita. Cada participante coloca dos parejas, en orden de ida y vuelta.
 2. Lanza los dados. Todos los poblados junto a las parcelas del número obtenido reciben recursos; las ciudades reciben el doble.
@@ -27,7 +42,7 @@ Las partidas se guardan automáticamente en `localStorage` después de cada acci
 - Rivales automáticos con colocación por probabilidad, construcción, mejoras, cartas, comercio bancario, negociación con otros participantes y decisiones de ladrón.
 - Escena procedural de Three.js: bosques, ovejas, montañas, campos, arcilla, poblados, ciudades, muelles, ladrón y océano animado. Todos los modelos se generan en código.
 
-El juego base utiliza **carreteras** terrestres. Los barcos, puentes y otras reglas de expansiones no están incluidos. Esta versión permite partidas completas locales; no incluye salas online, cuentas, servidor multijugador ni sincronización entre dispositivos. La IA es heurística, no un jugador experto. No hay comercio antes de lanzar los dados.
+El juego base utiliza **carreteras** terrestres. Los barcos, puentes y otras reglas de expansiones no están incluidos. Se puede jugar localmente, online por código y en Party con televisión y móviles, sin cuentas. La IA es heurística, no un jugador experto. No hay comercio antes de lanzar los dados.
 
 ## Robo del ladrón
 
@@ -45,7 +60,7 @@ Las cartas cambian de mano únicamente tras aceptar, y se comprueba que ambas pa
 
 ## Desarrollo
 
-Requisitos: Node.js 24 recomendado y npm. No necesitas base de datos ni claves para ejecutar el juego.
+Requisitos: Node.js 24 y npm. En desarrollo las salas se guardan en `.isla-rooms/`, excluido de Git; no necesitas claves externas. El plugin de Vite sirve tanto la interfaz como `/api/rooms`, también con `npm run preview`. Puedes cambiar la carpeta con `ISLA_ROOM_DIR`.
 
 ```sh
 cd /workspace/CatanUniversal
@@ -71,7 +86,9 @@ El entorno cloud ya está aislado: utiliza este checkout existente. No hace falt
 
 ## Despliegue en Vercel
 
-`vercel.json` configura el proyecto con Vite, `npm ci`, `npm run build` y salida `dist`. La aplicación es estática y no necesita secretos de ejecución.
+`vercel.json` configura Vite, `npm ci`, `npm run build`, salida `dist` y la función Node.js `api/rooms.ts`. Despliega la raíz del repositorio completa, incluyendo `api/` y `server/`; publicar solo `dist/` deja disponibles únicamente los modos locales.
+
+Para Online y Party, crea un almacén **privado de Vercel Blob** y conéctalo al proyecto en los entornos que vayas a usar. Vercel proporciona `BLOB_READ_WRITE_TOKEN` a la función; nunca lo expongas con prefijo `VITE_` ni lo envíes al cliente. El proyecto publicado ya tiene conectado `isla-universal-rooms` en Frankfurt y la función se ejecuta en esa región. El consumo de funciones y Blob depende del uso y de los límites del plan de Vercel.
 
 Opciones de publicación:
 
@@ -80,9 +97,17 @@ Opciones de publicación:
 
 Para que Codex publique desde este entorno, hace falta acceso autorizado a tu cuenta. Se ha declarado `VERCEL_TOKEN` como requisito de despliegue en los ajustes seguros del entorno, con destino `api.vercel.com`. No escribas tokens en el chat, archivos del repositorio ni comandos que los impriman. Los dominios `api.vercel.com` y `*.vercel.app` se han añadido al borrador de red para publicación y verificación. Revisa y guarda los cambios del entorno y publícalo cuando corresponda; guardar el borrador no aplica ni publica por sí solo la configuración.
 
-**Publicación:** el juego está disponible en https://isla-universal.vercel.app/ mediante un despliegue estático de producción en Vercel. El código fuente se conserva en https://github.com/Rapidfiend34/CatanUniversal. Las futuras actualizaciones requieren un nuevo despliegue; el despliegue actual no está conectado a Git.
+**Publicación:** el juego está disponible en https://isla-universal.vercel.app/ en Vercel. El código fuente se conserva en https://github.com/Rapidfiend34/CatanUniversal. Las futuras actualizaciones requieren desplegar el código fuente; el proyecto actual no está conectado a Git para despliegue automático.
 
-La carpeta `dist/` puede alojarse también en cualquier servidor web estático con HTTPS. No necesita redirecciones de rutas porque la aplicación no usa un router de servidor.
+La carpeta `dist/` puede alojarse también en cualquier servidor web estático con HTTPS para jugar contra la IA o en el mismo dispositivo. Las salas requieren además la API y almacenamiento privado persistente.
+
+## Servidor de salas y privacidad
+
+El servidor es la autoridad de las reglas, dados, mazo, robos y turnos de la IA. Cada dispositivo conserva un secreto aleatorio de 256 bits; el servidor almacena únicamente su hash para reconocer la plaza. El código sirve para unirse, no para recuperar identidades ajenas. La API proyecta la partida por participante: devuelve solo su mano, cantidades públicas de cartas y puntos visibles. La TV no recibe manos, cartas de desarrollo privadas ni orden del mazo, ni siquiera a través del diagnóstico `window.__isla`.
+
+La sincronización consulta el servidor aproximadamente cada 1,4 segundos con la pestaña visible, y cada 5 segundos en segundo plano. Se usan versiones, identificadores de acción y escrituras condicionales por ETag para rechazar acciones obsoletas, duplicados y cambios simultáneos incompatibles. Las lecturas son privadas y no se cachean. Las consultas sin cambios no reescriben el almacenamiento.
+
+En producción, los documentos viven en Vercel Blob privado y sobreviven a reinicios de funciones y nuevos despliegues. A las 48 horas se deniega el acceso, aunque los documentos no se borran automáticamente del almacén: su eliminación administrativa corresponde al propietario del proyecto. Las salas de desarrollo se guardan en archivos privados, con control de concurrencia. La limitación de creación/unión por IP es básica y por instancia; no sustituye protección distribuida para un servicio de gran escala.
 
 ## Estructura
 
@@ -94,7 +119,13 @@ La carpeta `dist/` puede alojarse también en cualquier servidor web estático c
 | `src/board.ts` | Modelos 3D, cámara, iluminación, selección y visualización de ubicaciones legales. |
 | `src/main.ts` | Interfaz, modales, guardado, importación/exportación y turnos. |
 | `src/style.css` | Diseño adaptable de escritorio y móvil. |
+| `src/online/` | Protocolo de vistas privadas y cliente de salas con reconexión. |
+| `server/rooms.ts` | Autorización, vestíbulo, reglas y turnos automáticos del servidor. |
+| `server/store.ts` | Persistencia con escrituras condicionales en Blob o archivos. |
+| `api/rooms.ts` | Entrada de la función HTTP para Vercel. |
 | `tests/engine.test.ts` | Reglas, conservación de recursos y simulaciones completas. |
+| `tests/rooms.test.ts` | Autorización, privacidad, concurrencia, reintentos y persistencia. |
 | `tests/game.spec.ts` | Pruebas reales de navegador con Playwright. |
+| `tests/online.spec.ts` | Amigos en navegadores independientes y Party con TV y móviles. |
 
 El motor usa actualizaciones inmutables mediante `execute(estado, comando)`; una operación ilegal lanza `RuleError` sin modificar el estado anterior. La aleatoriedad se puede inyectar para pruebas reproducibles. La escena recibe el estado final y no decide las reglas del juego.
