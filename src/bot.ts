@@ -1,4 +1,4 @@
-import { type Game, type Command, type Resource, RESOURCES, COSTS, canAfford, legalSettlements, legalRoads, countBuildings, tradeRatio, emptyHand, points } from './engine.js';
+import { type Game, type Command, type Resource, RESOURCES, COSTS, canAfford, legalSettlements, legalRoads, countBuildings, tradeRatio, emptyHand, points, isSecondary, total } from './engine.js';
 import { assessTrade, botTradeProposal } from './trading.js';
 
 export function siteScore(g: Game, id: number, p = g.current): number {
@@ -31,15 +31,21 @@ export function botCommand(g: Game): Command {
   });
   if (g.freeRoads) return { type: 'road', id: road() };
   const dev = p.dev.find(d => d.turn < g.turn && d.type !== 'victory' && !p.played);
-  if (dev) {
+  if (dev && !isSecondary(g)) {
     if (dev.type === 'knight' || (dev.type === 'roads' && roads.length)) return { type: 'dev', card: dev.type };
-    if (dev.type === 'monopoly') return { type: 'dev', card: 'monopoly', resources: [best([...RESOURCES], r => g.players.reduce((n, o, i) => n + (i !== g.current ? o.hand[r] : 0), 0))] };
+    if (dev.type === 'monopoly') {
+      // Choose victims by public hand size, and the resource by public production.
+      const targets = g.players.map((_, i) => i).filter(i => i !== g.current).sort((a, b) => total(g.players[b].hand) - total(g.players[a].hand)).slice(0, g.variant === 'expanded' ? 3 : g.players.length - 1);
+      const resource = best([...RESOURCES], r => g.vertices.reduce((sum, v) => sum + (v.owner !== null && targets.includes(v.owner) ? v.tiles.reduce((n, t) => n + (g.tiles[t].resource === r ? (6 - Math.abs(7 - g.tiles[t].number)) * (v.city ? 2 : 1) : 0), 0) : 0), 0));
+      return { type: 'dev', card: 'monopoly', resources: [resource], targets };
+    }
     if (dev.type === 'plenty' && RESOURCES.some(r => g.bank[r] >= 2)) { const r = best(RESOURCES.filter(r => g.bank[r] >= 2), r => 5 - p.hand[r] + (r === 'ore' ? 1 : 0)); return { type: 'dev', card: 'plenty', resources: [r, r] }; }
   }
   const city = g.vertices.find(v => v.owner === g.current && !v.city);
   if (city && countBuildings(g, g.current, true) < 4 && canAfford(g, COSTS.city)) return { type: 'city', id: best(g.vertices.filter(v => v.owner === g.current && !v.city), v => siteScore(g, v.id)).id };
   if (settlements.length && canAfford(g, COSTS.settlement)) return { type: 'settlement', id: best(settlements, id => siteScore(g, id)) };
   if (roads.length && canAfford(g, COSTS.road)) return { type: 'road', id: road() };
+  if (isSecondary(g)) return g.deck.length && canAfford(g, COSTS.dev) ? { type: 'buy' } : { type: 'end' };
   const offer = botTradeProposal(g);
   if (offer) return offer;
   // After negotiations, use the bank toward a specific purchase.

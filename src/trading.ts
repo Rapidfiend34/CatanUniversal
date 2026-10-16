@@ -1,4 +1,4 @@
-import { type Game, type Hand, type TradeOffer, type Command, RESOURCES, COSTS, emptyHand, total, points, legalRoads, legalSettlements, countBuildings, tradeRatio, validateTrade } from './engine.js';
+import { type Game, type Hand, type TradeOffer, type Command, RESOURCES, COSTS, emptyHand, total, points, legalRoads, legalSettlements, countBuildings, tradeRatio, validateTrade, isSecondary } from './engine.js';
 
 interface Target { cost: Partial<Hand>; priority: number }
 export function tradeTargets(g: Game, player: number): Target[] {
@@ -38,7 +38,7 @@ export function assessTrade(g: Game, offer: TradeOffer): { accept: boolean; reas
   return gain > .12 ? { accept: true, reason: 'El trato me ayuda a conseguir recursos para construir.' } : { accept: false, reason: 'Prefiero conservar esos recursos para mis construcciones.' };
 }
 export function botTradeProposal(g: Game): Extract<Command, { type: 'offer' }> | null {
-  if (g.phase !== 'action' || g.freeRoads || g.pendingTrade) return null;
+  if (g.phase !== 'action' || g.freeRoads || g.pendingTrade || isSecondary(g) || g.variant === 'expanded' && (g.tradeAttempts?.length || 0) >= 2) return null;
   const me = g.current, hand = g.players[me].hand, before = tradeHandValue(g, me, hand);
   let selected: Extract<Command, { type: 'offer' }> | null = null, best = .12;
   for (const { cost } of tradeTargets(g, me)) for (const receive of RESOURCES) {

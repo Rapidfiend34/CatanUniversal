@@ -29,7 +29,27 @@ Construye poblados, negocia recursos y reúne a tus amigos alrededor de un table
 | 🌍 **Online** | Amigos desde cualquier lugar | Crea una sala y comparte su código, enlace o QR. |
 | 📺 **Party** | Amigos con sus propios móviles | El tablero en la televisión y las cartas privadas en cada móvil. |
 
-**Partidas de 3 o 4 jugadores.** Online y Party necesitan al menos dos personas; las plazas restantes se completan con IA.
+**Clásico: 3–4 jugadores. Ampliado: 5–10 jugadores.** Ambos están disponibles en Solo, Local, Online y Party. Online y Party necesitan al menos dos personas; las plazas restantes se completan con IA.
+
+Para probar el ampliado tú solo: **Nueva partida → Un jugador + rivales automáticos → Ampliado → 10 jugadores**. Jugarás contra nueve bots.
+
+## Modo ampliado
+
+Elige **Ampliado** al crear una partida o una sala. Los costes, las dos construcciones iniciales, la producción de poblados/ciudades y la victoria a 10 puntos se mantienen.
+
+| Jugadores | Parcelas | Desiertos | Banco por recurso | Desarrollo | Puertos |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 5–6 | 30 | 2 | 30 | 38 | 11 |
+| 7–8 | 38 | 2 | 40 | 50 | 13 |
+| 9–10 | 49 | 3 | 50 | 63 | 15 |
+
+Tras cada turno principal, construye el jugador situado media vuelta más adelante —cinco posiciones en una partida de diez; redondeando hacia abajo con un número impar—. En esa **construcción intermedia** puede construir, mejorar ciudades, comprar desarrollo o pasar; no tira, comercia ni juega cartas. Cada jugador recibe una fase intermedia por vuelta y puede ganar en ella. Después continúa el siguiente turno principal.
+
+El banco es común y sus existencias son visibles. Los recursos vuelven al banco al pagar o descartar; con un 7 se sigue descartando la mitad si se tienen más de siete cartas. Si no alcanza un recurso para varios destinatarios, ninguno lo recibe; si solo debe cobrar uno, recibe lo que quede. El historial avisa de la escasez.
+
+**Monopolio** afecta a entre uno y tres rivales elegidos, sin revelar sus manos. Cada bot propone como máximo dos intercambios por turno principal. Se conservan un solo ladrón y los límites de cinco poblados, cuatro ciudades y quince carreteras por jugador.
+
+Los mapas ampliados conservan números simétricos entre 2/12, 3/11, 4/10, 5/9 y 6/8, sin seises ni ochos adyacentes. Las cantidades son una primera configuración de equilibrio para probar jugando.
 
 ## Capturas
 
@@ -87,7 +107,7 @@ El móvil muestra tus cartas y las acciones de tu turno. **Elegir ubicación** u
 
 ## Lo que encontrarás en la isla
 
-- **Un tablero diferente en cada partida:** 19 hexágonos, cinco recursos, nueve puertos y distribución sin 6 y 8 adyacentes.
+- **Un tablero diferente en cada partida:** 19 hexágonos en Clásico y hasta 49 en Ampliado, cinco recursos, puertos y distribución sin 6 y 8 adyacentes.
 - **Construcciones 3D:** funda poblados, traza carreteras y mejora tus asentamientos a ciudades.
 - **Comercio con decisiones:** banco, puertos e intercambios entre personas e IA con aceptación explícita.
 - **Cartas de desarrollo:** caballeros, carreteras, monopolio, abundancia y puntos de victoria secretos.

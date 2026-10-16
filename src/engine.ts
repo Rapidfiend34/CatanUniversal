@@ -2,7 +2,20 @@ export const RESOURCES = ['wood', 'brick', 'sheep', 'wheat', 'ore'] as const;
 export type Resource = typeof RESOURCES[number];
 export type Hand = Record<Resource, number>;
 export const NAMES: Record<Resource, string> = { wood: 'Madera', brick: 'Arcilla', sheep: 'Lana', wheat: 'Trigo', ore: 'Mineral' };
-export const COLORS = ['#d46d49', '#5299ad', '#a79b58', '#a581b3'];
+export const COLORS = ['#d46d49', '#5299ad', '#a79b58', '#a581b3', '#d5a52e', '#328975', '#bf6394', '#5670bd', '#9b7049', '#647168'];
+export type Variant = 'classic' | 'expanded';
+export const BOT_NAMES = ['Olivia', 'Nicolás', 'Valeria', 'Bruno', 'Sofía', 'Diego', 'Emma', 'Leo', 'Alma', 'Hugo'];
+export function validPlayerCount(n: number, variant: Variant = 'classic') { return Number.isInteger(n) && (variant === 'classic' ? n >= 3 && n <= 4 : variant === 'expanded' && n >= 5 && n <= 10); }
+export function gameRules(n: number, variant: Variant = 'classic') {
+  if (!validPlayerCount(n, variant)) throw new Error('Elige 3–4 jugadores en Clásico o 5–10 en Ampliado.');
+  if (variant === 'classic') return { terrain: [4, 3, 4, 4, 3, 1], bank: 19, dev: [14, 5, 2, 2, 2], ports: 9 };
+  if (n <= 6) return { terrain: [6, 5, 6, 6, 5, 2], bank: 30, dev: [21, 8, 3, 3, 3], ports: 11 };
+  if (n <= 8) return { terrain: [8, 6, 8, 8, 6, 2], bank: 40, dev: [28, 10, 4, 4, 4], ports: 13 };
+  return { terrain: [10, 8, 10, 10, 8, 3], bank: 50, dev: [35, 13, 5, 5, 5], ports: 15 };
+}
+export const bankSize = (g: Game) => gameRules(g.players.length, g.variant).bank;
+export const isSecondary = (g: Game) => g.primary !== undefined && g.primary !== null;
+export const secondaryPlayer = (g: Game, primary = g.current) => (primary + Math.floor(g.players.length / 2)) % g.players.length;
 export const emptyHand = (): Hand => ({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 });
 export const total = (h: Hand) => RESOURCES.reduce((n, r) => n + h[r], 0);
 export type Dev = 'knight' | 'victory' | 'roads' | 'monopoly' | 'plenty';
@@ -13,18 +26,22 @@ export interface Edge { id: number; a: number; b: number; tiles: number[]; owner
 export interface Player { name: string; bot: boolean; color: string; hand: Hand; dev: { type: Dev; turn: number }[]; knights: number; played: boolean }
 export interface TradeOffer { from: number; to: number; give: Hand; receive: Hand }
 export type Phase = 'setup-settlement' | 'setup-road' | 'roll' | 'discard' | 'robber' | 'steal' | 'action' | 'finished';
-export interface Game { version: 1; tiles: Tile[]; vertices: Vertex[]; edges: Edge[]; players: Player[]; bank: Hand; deck: Dev[]; current: number; phase: Phase; setup: number; anchor: number | null; turn: number; dice: [number, number] | null; robber: number; discards: number[]; resume: 'roll' | 'action'; victims: number[]; freeRoads: number; longest: number | null; army: number | null; winner: number | null; log: string[]; lastProduction: number[]; pendingTrade?: TradeOffer | null; tradeAttempts?: number[] }
+export interface Game { version: 1; variant?: Variant; primary?: number | null; tiles: Tile[]; vertices: Vertex[]; edges: Edge[]; players: Player[]; bank: Hand; deck: Dev[]; current: number; phase: Phase; setup: number; anchor: number | null; turn: number; dice: [number, number] | null; robber: number; discards: number[]; resume: 'roll' | 'action'; victims: number[]; freeRoads: number; longest: number | null; army: number | null; winner: number | null; log: string[]; lastProduction: number[]; pendingTrade?: TradeOffer | null; tradeAttempts?: number[] }
 export const COSTS: Record<'road' | 'settlement' | 'city' | 'dev', Partial<Hand>> = { road: { wood: 1, brick: 1 }, settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 }, city: { wheat: 2, ore: 3 }, dev: { sheep: 1, wheat: 1, ore: 1 } };
 export function shuffle<T>(items: T[], rng = Math.random): T[] { const a = [...items]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-export function newGame(config: { name: string; bot: boolean }[], rng = Math.random): Game {
-  if (config.length < 3 || config.length > 4) throw new Error('La partida necesita 3 o 4 jugadores.');
+export function newGame(config: { name: string; bot: boolean }[], rng = Math.random, variant: Variant = 'classic'): Game {
+  const rules = gameRules(config.length, variant);
   const tiles: Tile[] = [], vertices: Vertex[] = [], edges: Edge[] = [];
   const vs = new Map<string, number>(), es = new Map<string, number>();
-  const terrain = shuffle<Resource | 'desert'>([...Array(4).fill('wood'), ...Array(4).fill('sheep'), ...Array(4).fill('wheat'), ...Array(3).fill('brick'), ...Array(3).fill('ore'), 'desert'], rng);
-  // Backtracking distributes the standard tokens without adjacent sixes/eights.
-  const numbers = shuffle([2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12], rng);
-  for (let r = -2; r <= 2; r++) for (let q = -2; q <= 2; q++) {
-    if (Math.abs(q + r) > 2) continue;
+  const terrain = shuffle<Resource | 'desert'>(variant === 'classic' ? [...Array(4).fill('wood'), ...Array(4).fill('sheep'), ...Array(4).fill('wheat'), ...Array(3).fill('brick'), ...Array(3).fill('ore'), 'desert'] : [...RESOURCES, 'desert' as const].flatMap((r, i) => Array(rules.terrain[i]).fill(r)), rng);
+  const standard = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
+  const extra = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+  const numbers = shuffle(variant === 'classic' ? standard : config.length <= 6 ? [...standard, ...extra] : config.length <= 8 ? [...standard, ...standard] : [...standard, ...standard, ...extra], rng);
+  const coords: { q: number; r: number }[] = [];
+  const radius = variant === 'classic' ? 2 : 5;
+  for (let r = -radius; r <= radius; r++) for (let q = -radius; q <= radius; q++) if (Math.abs(q + r) <= radius) coords.push({ q, r });
+  if (variant === 'expanded') coords.sort((a, b) => (a.q * a.q + a.q * a.r + a.r * a.r) - (b.q * b.q + b.q * b.r + b.r * b.r));
+  for (const { q, r } of coords.slice(0, terrain.length)) {
     const id = tiles.length, x = Math.sqrt(3) * (q + r / 2), z = 1.5 * r;
     const tile: Tile = { id, q, r, x, z, resource: terrain[id], number: 0, vertices: [] };
     for (let k = 0; k < 6; k++) {
@@ -53,11 +70,21 @@ export function newGame(config: { name: string; bot: boolean }[], rng = Math.ran
     }
     t.number = 0; return false;
   }
-  assign(0, numbers);
+  if (variant === 'classic') assign(0, numbers);
+  else {
+    // A three-colouring of the hex grid guarantees non-adjacent 6/8s, without
+    // exponential backtracking on large boards. Pick a random viable colour.
+    const hot = numbers.filter(n => n === 6 || n === 8);
+    const groups = [0, 1, 2].map(c => land.filter(t => ((t.q - t.r) % 3 + 3) % 3 === c)).filter(group => group.length >= hot.length);
+    const sites = shuffle(shuffle(groups, rng)[0], rng).slice(0, hot.length);
+    sites.forEach((t, i) => { t.number = hot[i]; });
+    const rest = numbers.filter(n => n !== 6 && n !== 8);
+    land.filter(t => !t.number).forEach((t, i) => { t.number = rest[i]; });
+  }
   const coast = edges.filter(e => e.tiles.length === 1).sort((a, b) => Math.atan2(vertices[a.a].z + vertices[a.b].z, vertices[a.a].x + vertices[a.b].x) - Math.atan2(vertices[b.a].z + vertices[b.b].z, vertices[b.a].x + vertices[b.b].x));
-  const ports = shuffle<Resource | 'any'>(['any', 'any', 'any', 'any', ...RESOURCES], rng);
-  ports.forEach((p, i) => { const e = coast[Math.floor(i * coast.length / 9)]; vertices[e.a].port = p; vertices[e.b].port = p; });
-  return { version: 1, tiles, vertices, edges, players: config.map((p, i) => ({ ...p, name: p.name.trim().slice(0, 22) || `Jugador ${i + 1}`, color: COLORS[i], hand: emptyHand(), dev: [], knights: 0, played: false })), bank: { wood: 19, brick: 19, sheep: 19, wheat: 19, ore: 19 }, deck: shuffle<Dev>([...Array(14).fill('knight'), ...Array(5).fill('victory'), 'roads', 'roads', 'monopoly', 'monopoly', 'plenty', 'plenty'], rng), current: 0, phase: 'setup-settlement', setup: 0, anchor: null, turn: 0, dice: null, robber: tiles.find(t => t.resource === 'desert')!.id, discards: config.map(() => 0), resume: 'action', victims: [], freeRoads: 0, longest: null, army: null, winner: null, log: ['Una nueva isla. Una historia por construir.'], lastProduction: [] };
+  const ports = shuffle<Resource | 'any'>(variant === 'classic' ? ['any', 'any', 'any', 'any', ...RESOURCES] : [...Array(rules.ports - 10).fill('any'), ...RESOURCES, ...RESOURCES], rng);
+  ports.forEach((p, i) => { const e = coast[Math.floor(i * coast.length / ports.length)]; vertices[e.a].port = p; vertices[e.b].port = p; });
+  return { version: 1, variant, primary: null, tiles, vertices, edges, players: config.map((p, i) => ({ ...p, name: p.name.trim().slice(0, 22) || `Jugador ${i + 1}`, color: COLORS[i], hand: emptyHand(), dev: [], knights: 0, played: false })), bank: Object.fromEntries(RESOURCES.map(r => [r, rules.bank])) as Hand, deck: shuffle<Dev>((['knight', 'victory', 'roads', 'monopoly', 'plenty'] as Dev[]).flatMap((d, i) => Array(rules.dev[i]).fill(d)), rng), current: 0, phase: 'setup-settlement', setup: 0, anchor: null, turn: 0, dice: null, robber: tiles.find(t => t.resource === 'desert')!.id, discards: config.map(() => 0), resume: 'action', victims: [], freeRoads: 0, longest: null, army: null, winner: null, log: ['Una nueva isla. Una historia por construir.'], lastProduction: [] };
 }
 export const canAfford = (g: Game, cost: Partial<Hand>, p = g.current) => RESOURCES.every(r => g.players[p].hand[r] >= (cost[r] || 0));
 export const countBuildings = (g: Game, p: number, city: boolean) => g.vertices.filter(v => v.owner === p && v.city === city).length;
@@ -92,17 +119,18 @@ function awards(g: Game) {
     else if (g[kind] === null || !candidates.includes(g[kind]!)) g[kind] = null;
   }
 }
-export type Command = { type: 'settlement' | 'city' | 'road'; id: number } | { type: 'roll' } | { type: 'end' } | { type: 'robber'; tile: number } | { type: 'steal'; player: number; card?: number } | { type: 'discard'; player: number; cards: Hand } | { type: 'trade'; give: Resource; receive: Resource } | { type: 'offer'; player: number; give: Hand; receive: Hand } | { type: 'respond'; player: number; accept: boolean; reason?: string } | { type: 'buy' } | { type: 'dev'; card: Dev; resources?: Resource[] };
+export type Command = { type: 'settlement' | 'city' | 'road'; id: number } | { type: 'roll' } | { type: 'end' } | { type: 'robber'; tile: number } | { type: 'steal'; player: number; card?: number } | { type: 'discard'; player: number; cards: Hand } | { type: 'trade'; give: Resource; receive: Resource } | { type: 'offer'; player: number; give: Hand; receive: Hand } | { type: 'respond'; player: number; accept: boolean; reason?: string } | { type: 'buy' } | { type: 'dev'; card: Dev; resources?: Resource[]; targets?: number[] };
 export class RuleError extends Error {}
 const requireRule = (ok: unknown, message: string): void => { if (!ok) throw new RuleError(message); };
 export function validateTrade(g: Game, offer: TradeOffer, requireBothHands = false): void {
   requireRule(offer.from === g.current && Number.isInteger(offer.to) && g.players[offer.to] && offer.to !== offer.from, 'Elige otro jugador.');
-  requireRule(offer.give && offer.receive && RESOURCES.every(r => Number.isInteger(offer.give[r]) && Number.isInteger(offer.receive[r]) && offer.give[r] >= 0 && offer.receive[r] >= 0 && offer.receive[r] <= 19 && (!offer.give[r] || !offer.receive[r])) && total(offer.give) > 0 && total(offer.receive) > 0, 'La oferta debe intercambiar recursos distintos y cantidades válidas.');
+  requireRule(offer.give && offer.receive && RESOURCES.every(r => Number.isInteger(offer.give[r]) && Number.isInteger(offer.receive[r]) && offer.give[r] >= 0 && offer.receive[r] >= 0 && offer.receive[r] <= bankSize(g) && (!offer.give[r] || !offer.receive[r])) && total(offer.give) > 0 && total(offer.receive) > 0, 'La oferta debe intercambiar recursos distintos y cantidades válidas.');
   requireRule(RESOURCES.every(r => g.players[offer.from].hand[r] >= offer.give[r]), 'No tienes los recursos que ofreces.');
   if (requireBothHands) requireRule(RESOURCES.every(r => g.players[offer.to].hand[r] >= offer.receive[r]), 'El destinatario no tiene los recursos solicitados.');
 }
 export function execute(state: Game, cmd: Command, rng = Math.random): Game {
   const g = structuredClone(state), p = g.players[g.current];
+  if (isSecondary(g)) requireRule(['road', 'settlement', 'city', 'buy', 'end'].includes(cmd.type), 'La construcción intermedia solo permite construir, comprar desarrollo o pasar.');
   requireRule(g.phase !== 'finished', 'La partida ha terminado.');
   requireRule(!g.pendingTrade || cmd.type === 'respond', 'Responde al intercambio pendiente antes de continuar.');
   const say = (s: string) => { g.log.unshift(s); g.log = g.log.slice(0, 70); };
@@ -149,7 +177,8 @@ export function execute(state: Game, cmd: Command, rng = Math.random): Game {
         for (const r of RESOURCES) {
           const demand = pending.reduce((n, h) => n + h[r], 0), recipients = pending.map((h, i) => h[r] ? i : -1).filter(i => i >= 0);
           if (demand <= g.bank[r]) pending.forEach((h, i) => { g.players[i].hand[r] += h[r]; g.bank[r] -= h[r]; });
-          else if (recipients.length === 1) { const i = recipients[0]; g.players[i].hand[r] += g.bank[r]; g.bank[r] = 0; }
+          else if (recipients.length === 1) { const i = recipients[0]; g.players[i].hand[r] += g.bank[r]; g.bank[r] = 0; say(`Escasez de ${NAMES[r]}: se entrega lo que queda en el banco.`); }
+          else if (demand) say(`Escasez de ${NAMES[r]}: no alcanza para todos y nadie cobra este recurso.`);
         }
         g.phase = 'action';
       } break;
@@ -188,11 +217,21 @@ export function execute(state: Game, cmd: Command, rng = Math.random): Game {
       const i = p.dev.findIndex(d => d.type === cmd.card && d.turn < g.turn); requireRule(i >= 0 && cmd.card !== 'victory', 'Esta carta no puede jugarse este turno.');
       if (cmd.card === 'roads') { requireRule(legalRoads(g, false).length, 'No tienes carreteras disponibles.'); g.resume = g.phase as 'roll' | 'action'; g.phase = 'action'; g.freeRoads = Math.min(2, 15 - g.edges.filter(e => e.owner === g.current).length); }
       if (cmd.card === 'knight') { p.knights++; g.resume = g.phase as 'roll' | 'action'; g.phase = 'robber'; }
-      if (cmd.card === 'monopoly') { const r = cmd.resources?.[0]; requireRule(r && RESOURCES.includes(r), 'Elige un recurso.'); for (let j = 0; j < g.players.length; j++) if (j !== g.current) { p.hand[r!] += g.players[j].hand[r!]; g.players[j].hand[r!] = 0; } }
+      if (cmd.card === 'monopoly') {
+        const r = cmd.resources?.[0]; requireRule(r && RESOURCES.includes(r), 'Elige un recurso.');
+        const targets = g.variant === 'expanded' ? cmd.targets : g.players.map((_, i) => i).filter(i => i !== g.current);
+        requireRule(Array.isArray(targets) && targets.length >= 1 && targets.length <= (g.variant === 'expanded' ? 3 : g.players.length - 1) && new Set(targets).size === targets.length && targets.every(i => Number.isInteger(i) && !!g.players[i] && i !== g.current), 'Elige entre uno y tres rivales distintos.');
+        for (const j of targets!) { p.hand[r!] += g.players[j].hand[r!]; g.players[j].hand[r!] = 0; }
+      }
       if (cmd.card === 'plenty') { const rs = cmd.resources || []; requireRule(rs.length === 2 && rs.every(r => RESOURCES.includes(r)), 'Elige dos recursos.'); const h = emptyHand(); rs.forEach(r => h[r]++); requireRule(RESOURCES.every(r => g.bank[r] >= h[r]), 'El banco no tiene esos recursos.'); RESOURCES.forEach(r => { g.bank[r] -= h[r]; p.hand[r] += h[r]; }); }
       p.dev.splice(i, 1); p.played = true; say(`${p.name} juega ${DEV_NAMES[cmd.card]}.`); break;
     }
-    case 'end': action(); g.current = (g.current + 1) % g.players.length; g.turn++; g.players[g.current].played = false; g.phase = 'roll'; g.dice = null; g.lastProduction = []; g.tradeAttempts = []; say(`Turno de ${g.players[g.current].name}.`); break;
+    case 'end': action();
+      if (g.variant === 'expanded' && !isSecondary(g)) {
+        g.primary = g.current; g.current = secondaryPlayer(g); g.tradeAttempts = [];
+        say(`Construcción intermedia de ${g.players[g.current].name}: construye, compra desarrollo o pasa.`); break;
+      }
+      g.current = ((g.primary ?? g.current) + 1) % g.players.length; g.primary = null; g.turn++; g.players[g.current].played = false; g.phase = 'roll'; g.dice = null; g.lastProduction = []; g.tradeAttempts = []; say(`Turno de ${g.players[g.current].name}.`); break;
   }
   awards(g);
   if (g.turn && points(g, g.current) >= 10) { g.winner = g.current; g.phase = 'finished'; say(`${g.players[g.current].name} gana con ${points(g, g.current)} puntos.`); }

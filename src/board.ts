@@ -20,6 +20,8 @@ export class Board {
   private lastGame: Game | null = null;
   private lastMode: Mode = 'inspect';
   private selectionKey = '';
+  private mapScale = 1;
+  private islandBase = new THREE.Group();
   private sea: THREE.ShaderMaterial;
   private hovered: THREE.Object3D | null = null;
   private down = { x: 0, y: 0 };
@@ -49,8 +51,8 @@ export class Board {
     sun.shadow.bias = -.0003; sun.shadow.normalBias = .025; sun.shadow.radius = 4; this.scene.add(sun);
     this.sea = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 } }, vertexShader: 'varying vec3 vPos; void main(){vPos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: `varying vec3 vPos; uniform float uTime; void main(){float d=length(vPos.xy); float wave=sin(d*9.-uTime*.6)*.5+.5; float ring=smoothstep(.91,1.,wave)*smoothstep(4.8,5.3,d)*(1.-smoothstep(5.5,8.,d)); vec3 a=vec3(.69,.80,.77); vec3 b=vec3(.84,.89,.85); float mixv=1.-exp(-d*.11); vec3 col=mix(a,b,mixv)+ring*.055; float w=sin(vPos.x*4.+uTime*.2)*sin(vPos.y*3.+uTime*.3); gl_FragColor=vec4(col+w*.005,1.);}` });
     const water = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), this.sea); water.rotation.x = -Math.PI / 2; water.position.y = -.28; this.scene.add(water);
-    const island = new THREE.Mesh(new THREE.CylinderGeometry(4.88, 5.10, .32, 72), mat('#c3b598')); island.position.y = -.06; island.receiveShadow = true; this.scene.add(island);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(4.96, 5.05, .075, 72), mat('#e4d7b7')); rim.position.y = .09; rim.receiveShadow = true; this.scene.add(rim);
+    const island = new THREE.Mesh(new THREE.CylinderGeometry(4.88, 5.10, .32, 72), mat('#c3b598')); island.position.y = -.06; island.receiveShadow = true; this.islandBase.add(island);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(4.96, 5.05, .075, 72), mat('#e4d7b7')); rim.position.y = .09; rim.receiveShadow = true; this.islandBase.add(rim); this.scene.add(this.islandBase);
     this.scene.add(this.ground, this.pieces, this.targets);
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(host); this.resize();
     host.addEventListener('pointerdown', e => { this.down = { x: e.clientX, y: e.clientY }; });
@@ -61,7 +63,7 @@ export class Board {
     host.addEventListener('pointermove', e => { const hit = this.pick(e); this.hovered = hit; host.style.cursor = hit ? 'pointer' : 'grab'; });
     const frame = (t: number) => { this.animation = requestAnimationFrame(frame); if (document.hidden || !this.host.clientWidth || !this.host.clientHeight) return; this.sea.uniforms.uTime.value = t / 1000; this.controls.update(); this.targets.children.forEach(c => { const m = c as THREE.Mesh; if (m.material instanceof THREE.MeshStandardMaterial) m.material.emissiveIntensity = c === this.hovered ? .65 : .18 + Math.sin(t / 550) * .08; }); this.renderer.render(this.scene, this.camera); }; frame(0);
   }
-  private resize() { const w = this.host.clientWidth, h = this.host.clientHeight; if (!w || !h) return; const aspect = w / h, height = aspect < 1 ? 6.9 / aspect : 6.5; this.camera.left = -height * aspect; this.camera.right = height * aspect; this.camera.top = height; this.camera.bottom = -height; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); }
+  private resize() { const w = this.host.clientWidth, h = this.host.clientHeight; if (!w || !h) return; const aspect = w / h, height = (aspect < 1 ? 6.9 / aspect : 6.5) * this.mapScale; this.camera.left = -height * aspect; this.camera.right = height * aspect; this.camera.top = height; this.camera.bottom = -height; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); }
   private pick(e: PointerEvent): THREE.Object3D | null {
     const b = this.renderer.domElement.getBoundingClientRect(); this.pointer.set((e.clientX - b.left) / b.width * 2 - 1, -(e.clientY - b.top) / b.height * 2 + 1); this.ray.setFromCamera(this.pointer, this.camera);
     const hits = this.ray.intersectObjects(this.targets.children, true); if (hits.length) return hits[0].object;
@@ -70,6 +72,10 @@ export class Board {
   private mesh(geo: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D, x: number, y: number, z: number) { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; }
   private disposeGroup(group: THREE.Group) { group.traverse(o => { if (o instanceof THREE.Mesh || o instanceof THREE.Sprite) { if (o instanceof THREE.Mesh) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); }); } }); group.clear(); }
   create(g: Game) {
+    this.mapScale = Math.max(1, ...g.vertices.map(v => Math.hypot(v.x, v.z) / 4.6));
+    this.islandBase.scale.set(this.mapScale, 1, this.mapScale);
+    this.resize(); this.home();
+    this.scene.traverse(o => { if (o instanceof THREE.DirectionalLight) { Object.assign(o.shadow.camera, { left: -9 * this.mapScale, right: 9 * this.mapScale, top: 9 * this.mapScale, bottom: -9 * this.mapScale }); o.shadow.camera.updateProjectionMatrix(); } });
     this.disposeGroup(this.ground); this.selectionKey = '';
     for (const t of g.tiles) {
       const group = new THREE.Group(); group.position.set(t.x, 0, t.z); group.userData = { kind: 'tile', id: t.id }; this.ground.add(group);

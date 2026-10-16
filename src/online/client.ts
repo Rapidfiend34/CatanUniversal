@@ -1,4 +1,4 @@
-import type { Command } from '../engine';
+import type { Command, Variant } from '../engine';
 import type { RoomMode, RoomView } from './types';
 export interface Session { code: string; token: string; screen: boolean }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -39,9 +39,9 @@ export class RoomClient {
     const url = new URL(location.href); url.search = ''; url.searchParams.set('room', session.code); if (session.screen) url.searchParams.set('screen', 'tv'); history.replaceState(null, '', url);
     this.accept(view); this.schedule();
   }
-  async create(mode: RoomMode, name: string, capacity: number) {
+  async create(mode: RoomMode, name: string, capacity: number, variant: Variant = 'classic') {
     const session = { code: roomCode(), token: secret(), screen: mode === 'party' }; this.remember(session);
-    const view = await this.request({ op: 'create', ...session, mode, name, capacity }, session); this.attach(session, view);
+    const view = await this.request({ op: 'create', ...session, mode, name, capacity, variant }, session); this.attach(session, view);
   }
   async join(code: string, name: string) {
     code = code.toUpperCase().replace(/\s/g, '');

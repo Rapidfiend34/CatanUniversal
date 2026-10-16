@@ -79,3 +79,11 @@ En producción, los documentos viven en Vercel Blob privado y sobreviven a reini
 | `tests/online.spec.ts` | Amigos en navegadores independientes y Party con TV y móviles. |
 
 El motor usa actualizaciones inmutables mediante `execute(estado, comando)`; una operación ilegal lanza `RuleError` sin modificar el estado anterior. La aleatoriedad se puede inyectar para pruebas reproducibles. La escena recibe el estado final y no decide las reglas del juego.
+
+## Variante ampliada
+
+`Game.variant` distingue `classic` (3–4) y `expanded` (5–10). Las partidas y salas antiguas sin variante siguen siendo clásicas. `gameRules` define terrenos, banco, mazo y puertos; los límites de validación de acciones usan la partida real. `src/save.ts` valida también guardados ampliados y conserva el balance banco + manos.
+
+Durante una construcción intermedia, `current` identifica al constructor y `primary` conserva el jugador cuyo turno principal acaba de terminar; `phase` sigue siendo `action`. Solo se permiten construir, comprar y terminar. Al finalizar se pasa a `(primary + 1) % jugadores`, se incrementa `turn` y empieza la fase `roll`. La IA y la autorización del servidor usan el mismo actor. El estado se conserva al guardar o reconectar y la TV sigue recibiendo únicamente manos públicas.
+
+`npm test` incluye mapas y suministros, turnos intermedios, Monopolio, escasez, compatibilidad de guardados, salas de diez participantes y partidas completas de IA de 5–10 jugadores. Con el servidor arrancado, `npm run test:e2e -- tests/expanded.spec.ts` prueba creación en solitario con nueve bots, colocación inicial, recarga, controles móviles y salas Online/Party ampliadas.
