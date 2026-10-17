@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { type Game, type Resource, legalRoads, legalSettlements } from './engine';
+import { theme } from './theme';
 
 export type Mode = 'inspect' | 'road' | 'settlement' | 'city';
 const terrain: Record<Resource | 'desert', string> = { wood: '#63876a', brick: '#c18d76', sheep: '#a4b58a', wheat: '#cfb578', ore: '#929c9d', desert: '#ddc49a' };
+const voxelTerrain: Record<Resource | 'desert', string> = { wood: '#397544', brick: '#a96d5d', sheep: '#c9d3bf', wheat: '#c7a94c', ore: '#718087', desert: '#c9ae75' };
 const mat = (color: THREE.ColorRepresentation, roughness = .9) => new THREE.MeshStandardMaterial({ color, roughness });
 export class Board {
   renderer: THREE.WebGLRenderer;
@@ -72,6 +74,9 @@ export class Board {
   private mesh(geo: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D, x: number, y: number, z: number) { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; }
   private disposeGroup(group: THREE.Group) { group.traverse(o => { if (o instanceof THREE.Mesh || o instanceof THREE.Sprite) { if (o instanceof THREE.Mesh) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); }); } }); group.clear(); }
   create(g: Game) {
+    const voxel = theme() === 'voxel';
+    this.renderer.setClearColor(voxel ? '#87b9d6' : '#dbe6df');
+    this.scene.fog = new THREE.Fog(voxel ? '#87b9d6' : '#dbe6df', 28, 75);
     this.mapScale = Math.max(1, ...g.vertices.map(v => Math.hypot(v.x, v.z) / 4.6));
     this.islandBase.scale.set(this.mapScale, 1, this.mapScale);
     this.resize(); this.home();
@@ -79,15 +84,15 @@ export class Board {
     this.disposeGroup(this.ground); this.selectionKey = '';
     for (const t of g.tiles) {
       const group = new THREE.Group(); group.position.set(t.x, 0, t.z); group.userData = { kind: 'tile', id: t.id }; this.ground.add(group);
-      this.mesh(new THREE.CylinderGeometry(.963, .963, .27, 6), mat(terrain[t.resource]), group, 0, .27, 0);
+      this.mesh(new THREE.CylinderGeometry(.963, .963, .27, voxel ? 4 : 6), mat((voxel ? voxelTerrain : terrain)[t.resource]), group, 0, .27, 0);
       const rand = (n: number) => { const x = Math.sin(t.id * 171.3 + n * 37.17 + 1) * 43758.5453; return x - Math.floor(x); };
       for (let i = 0; i < (t.resource === 'ore' ? 5 : t.resource === 'wood' ? 9 : 7); i++) {
         const a = rand(i * 3) * Math.PI * 2, radius = .4 + rand(i * 3 + 1) * .29, x = Math.cos(a) * radius, z = Math.sin(a) * radius;
         if (t.resource === 'wood') {
           const h = .3 + rand(i + 50) * .3;
           this.mesh(new THREE.CylinderGeometry(.025, .04, h, 5), mat('#756449'), group, x, .42 + h / 2, z);
-          this.mesh(new THREE.ConeGeometry(.15, h, 6), mat(i % 2 ? '#345b44' : '#436e4b'), group, x, .55 + h / 2, z);
-          this.mesh(new THREE.ConeGeometry(.11, h * .75, 6), mat('#537f53'), group, x, .68 + h / 2, z);
+          this.mesh(voxel ? new THREE.BoxGeometry(.28, h, .28) : new THREE.ConeGeometry(.15, h, 6), mat(i % 2 ? '#345b44' : '#436e4b'), group, x, .55 + h / 2, z);
+          this.mesh(voxel ? new THREE.BoxGeometry(.22, h * .55, .22) : new THREE.ConeGeometry(.11, h * .75, 6), mat('#537f53'), group, x, .68 + h / 2, z);
         } else if (t.resource === 'ore') {
           const h = .3 + rand(i + 10) * .55;
           const m = this.mesh(new THREE.ConeGeometry(.22 + h / 9, h, 5), mat(i % 2 ? '#6c7e7b' : '#83918a'), group, x, .41 + h / 2, z); m.rotation.y = i * 1.2;

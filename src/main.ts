@@ -1,6 +1,7 @@
 import './style.css';
+import './theme.css';
 import { Board, type Mode } from './board';
-import { type Game, type Variant, type Command, type Hand, type Dev, type Resource, newGame, execute, RESOURCES, NAMES, DEV_NAMES, COSTS, total, points, legalRoads, legalSettlements, longestLength, tradeRatio, canAfford, countBuildings, emptyHand, BOT_NAMES, bankSize, isSecondary, secondaryPlayer } from './engine';
+import { type Game, type Variant, type Command, type Hand, type Dev, type Resource, newGame, execute, RESOURCES, NAMES as BASE_NAMES, DEV_NAMES, COSTS, total, points, legalRoads, legalSettlements, longestLength, tradeRatio, canAfford, countBuildings, emptyHand, BOT_NAMES, bankSize, isSecondary, secondaryPlayer } from './engine';
 import { validateSave } from './save';
 import { botCommand } from './bot';
 import { icon } from './icons';
@@ -11,10 +12,13 @@ import type { RoomView, RoomMode } from './online/types';
 import { IslandAudio, gameSounds } from './audio';
 import { HISTORY_CATEGORIES, historyEntries, filterHistory, type HistoryFilter } from './history';
 import { IslandPWA } from './pwa';
+import { resourceName, setTheme, theme, themeLabel, type ThemeId } from './theme';
+const NAMES = new Proxy(BASE_NAMES, { get(target, key: string) { return RESOURCES.includes(key as Resource) ? resourceName(key as Resource) : Reflect.get(target, key); } });
 
 const SAVE_KEY = 'isla-universal-v1';
 const network = new RoomClient();
 const pwa = new IslandPWA();
+document.body.dataset.theme = theme();
 let receivedGameVersion = -1, receivedRoomCode = '', roomOpening = false, controllerFocus = true;
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 let game: Game;
@@ -77,7 +81,8 @@ function dispatch(command: Command, automated = false) {
 }
 function humanViewIndex() { if (network.session) return network.view?.self ?? game.current; if (game.pendingTrade && !game.players[game.pendingTrade.to].bot) return game.pendingTrade.to; return game.players[game.current].bot ? Math.max(0, game.players.findIndex(p => !p.bot)) : game.current; }
 function resourceIcon(r: Resource, size = 22) { return `<span class="resource-symbol ${r}">${icon(r, size)}</span>`; }
-function costHtml(cost: Partial<Hand>) { return Object.entries(cost).map(([r, n]) => `<span class="cost-item ${r}" title="${n} ${NAMES[r as Resource]}">${icon(r, 13)}${n! > 1 ? n : ''}</span>`).join(''); }
+function costHtml(cost: Partial<Hand>) { return Object.entries(cost).map(([r, n]) => `<span class="cost-item ${r}" title="${n} ${resourceName(r as Resource)}">${icon(r, 13)}${n! > 1 ? n : ''}</span>`).join(''); }
+function themeSettings() { return `<section class="theme-settings" aria-label="Tema visual"><h3>Estilo de la isla</h3><p class="form-note">Cambia la apariencia sin modificar las reglas ni tus partidas.</p><div class="theme-choices">${(['classic', 'voxel'] as ThemeId[]).map(id => `<button class="setting-row ${theme() === id ? 'selected' : ''}" data-act="theme" data-theme="${id}">${icon(id === 'voxel' ? 'cube' : 'island', 23)}<span>${id === 'voxel' ? 'Aldea cúbica' : 'Isla Universal'}<small>${id === 'voxel' ? 'Bloques, roble, hierro y aldeas' : 'Estilo natural original'}</small></span>${theme() === id ? '<b>Activo</b>' : ''}</button>`).join('')}</div><p class="form-note">El pack cúbico usa ilustraciones propias inspiradas en juegos de bloques; no incluye texturas oficiales.</p></section>`; }
 function phaseText() {
   const name = esc(game.players[game.current].name);
   if (game.pendingTrade) return { tag: 'UN TRATO SOBRE LA MESA', title: 'El comercio nos conecta.', text: `${esc(game.players[game.pendingTrade.to].name)} debe responder antes de continuar el turno.` };
@@ -284,10 +289,10 @@ function showPwaUpdate() {
 function showSettings() {
   const historyLink = `<button class="setting-row" data-act="log">${icon('compass', 23)}<span>Historial de la partida<small>Filtra por jugador, construcciones, intercambios y eventos importantes</small></span>${icon('arrow', 18)}</button>`;
   if (network.session) {
-    modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `${pwaSettings()}${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`);
+    modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `${themeSettings()}${pwaSettings()}${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`);
     return;
   }
-  modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `${pwaSettings()}${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`);
+  modal('settings', 'A tu manera.', `La partida se guarda en este navegador después de cada acción. Tema: ${themeLabel()}.`, `${themeSettings()}${pwaSettings()}${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`);
 }
 
 const qrCache = new Map<string, string>();
@@ -391,6 +396,7 @@ app.addEventListener('click', e => {
     case 'help': showHelp(); break;
     case 'new': showNew(); break;
     case 'settings': showSettings(); break;
+    case 'theme': { const next = button.dataset.theme as ThemeId; setTheme(next); document.body.dataset.theme = next; board?.create(game); showSettings(); render(); toast(next === 'voxel' ? 'Tema Aldea cúbica activado.' : 'Tema Isla Universal activado.'); break; }
     case 'pwa-install': void installPwa(); break;
     case 'pwa-update': showPwaUpdate(); break;
     case 'pwa-dismiss': pwa.dismissUpdate(); break;

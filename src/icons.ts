@@ -1,5 +1,6 @@
 const paths: Record<string, string> = {
   island: '<path d="m3 16 6-10 5 7 3-5 5 8H3Z"/><path d="M2 20c3-2 4 2 7 0s4 2 7 0 4 2 7 0"/>',
+  cube: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
   wood: '<path d="m12 2 6 8h-3l5 7H4l5-7H6l6-8Z"/><path d="M12 17v5"/>',
   brick: '<path d="m3 8 9-5 9 5v9l-9 5-9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v9M7.5 10.5v-5M16.5 15.5l4.5-2.5M3 13l9 5"/>',
   sheep: '<path d="M7 17a4 4 0 0 1-4-4 4 4 0 0 1 3-4 4 4 0 0 1 7-3 4 4 0 0 1 5 4l3 1v5l-4 1H7Z"/><path d="M7 17v4m8-4v4m4-10v2"/>',
