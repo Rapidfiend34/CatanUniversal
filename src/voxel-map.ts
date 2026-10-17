@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Tile } from './engine';
 import { VoxelMaterials, type Block } from './voxel-materials';
+import { SheepModels } from './sheep-model';
 
 export const BIOME_TOKEN = { x: .26, z: .32, y: .445 };
 export const BIOME_ROBBER = { x: -.25, z: .34, y: .43 };
@@ -11,6 +12,7 @@ type Cube = { x: number; y: number; z: number; w: number; h: number; d: number; 
 export class VoxelMap {
   private materials = new VoxelMaterials();
   private geometry = new THREE.BoxGeometry(1, 1, 1);
+  private sheepModels = new SheepModels();
 
   tile(tile: Tile) {
     const group = new THREE.Group();
@@ -99,13 +101,10 @@ export class VoxelMap {
       cube('planks', -.2, .49, -.64, .82, .026, .027); flower(-.13, .65); rock(.52, .05, .06);
     } else if (tile.resource === 'sheep') {
       const sheep = (x: number, z: number, size = 1) => {
-        const y = surface(x, z);
-        for (const dx of [-.06, .06]) for (const dz of [-.035, .035]) cube('dark', x + dx * size, y, z + dz * size, .028 * size, .07 * size, .028 * size);
-        cube('wool', x, y + .06 * size, z, .21 * size, .13 * size, .13 * size);
-        cube('dark', x + .12 * size, y + .09 * size, z, .075 * size, .085 * size, .09 * size);
-        cube('flower', x + .16 * size, y + .14 * size, z + .028 * size, .008, .015, .014);
+        const model = this.sheepModels.create();
+        model.position.set(x, surface(x, z), z); model.scale.setScalar(size); group.add(model);
       };
-      sheep(-.34, -.16); sheep(.12, -.35, .85); sheep(-.48, .31, .8);
+      sheep(-.43, -.22, .8); sheep(.10, -.33, .85); sheep(-.50, .32, .8);
       for (const x of [-.53, -.17, .19, .53]) cube('planks', x, surface(x, -.60), -.60, .035, .16, .035);
       cube('planks', 0, .55, -.60, 1.10, .03, .03);
       bush(.48, -.15); rock(-.61, .05, .07);
