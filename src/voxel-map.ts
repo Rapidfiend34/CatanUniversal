@@ -45,6 +45,23 @@ export class VoxelMap {
       cube(tile.resource === 'desert' ? 'sandstone' : 'dirt', x, .20, z, .12, h - .28, .12);
       cube(top, x, h - .08, z, .12, .08, .12, 0, tone);
     }
+    // An inverted, voxel-stepped island: soil near the surface, exposed rock
+    // below, ending in a small off-centre point. Deterministic per tile.
+    const layers = [.94, .82, .69, .56, .43, .31, .19, .08];
+    const layerHeight = .11 + (tile.id % 3) * .012;
+    const tipX = ((tile.id % 3) - 1) * .025, tipZ = ((tile.id % 5) - 2) * .015;
+    for (let level = 0; level < layers.length; level++) {
+      const scale = layers[level];
+      for (let iz = -7; iz <= 7; iz++) for (let ix = -6; ix <= 6; ix++) {
+        const x = ix * .12, z = iz * .12;
+        if (!inside(x / scale, z / scale, .065)) continue;
+        const kind: Block = tile.resource === 'desert' && level < 5 ? 'sandstone'
+          : tile.resource === 'brick' && level < 2 ? 'clay'
+          : tile.resource !== 'ore' && level < 3 ? 'dirt'
+          : tile.resource === 'ore' && (ix * 7 + iz * 3 + level + tile.id) % 11 === 0 ? 'iron' : 'stone';
+        cube(kind, x + tipX * (1 - scale), .14 - (level + 1) * layerHeight, z + tipZ * (1 - scale), .12, layerHeight, .12, 0, .90 - level * .018);
+      }
+    }
     const tree = (x: number, z: number, size: number) => {
       const y = surface(x, z);
       cube('bark', x, y, z, .105 * size, .42 * size, .105 * size);

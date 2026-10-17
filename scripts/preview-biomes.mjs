@@ -24,13 +24,13 @@ try {
     Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: .5, far: 35 });
     sun.shadow.bias = -.0003; sun.shadow.normalBias = .012; scene.add(sun);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: '#f4f1e8', roughness: 1 }));
-    floor.rotation.x = -Math.PI / 2; floor.position.y = -.07; floor.receiveShadow = true; scene.add(floor);
-    const camera = new THREE.OrthographicCamera(-1.22, 1.22, 1.05, -1.05, .1, 100);
-    camera.position.set(3.4, 3.4, 4.2); camera.lookAt(0, .42, 0);
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -1.20; floor.receiveShadow = true; scene.add(floor);
+    const camera = new THREE.OrthographicCamera(-1.48, 1.48, 1.27, -1.27, .1, 100);
+    camera.position.set(3.4, 3.4, 4.2); camera.lookAt(0, .10, 0);
     const resources = [['wood', 'Bosque de roble'], ['brick', 'Cantera de arcilla'], ['sheep', 'Pradera'], ['wheat', 'Campos de trigo'], ['ore', 'Mina de hierro'], ['desert', 'Desierto']];
     const root = document.createElement('main'); root.id = 'biome-gallery';
     root.style.cssText = 'padding:40px;background:#f4f1e8;color:#334537;font:16px system-ui;min-height:100vh';
-    root.innerHTML = '<div style="font-size:12px;letter-spacing:3px;color:#758568">ISLA UNIVERSAL · MUNDO DE BLOQUES</div><h1 style="font:36px Georgia;margin:12px 0 8px">Un mapa construido desde cero</h1><p style="margin:0 0 24px;color:#758568">Modelos 3D reales del juego · texturas pixeladas por cara · terreno escalonado</p><div id="models" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px"></div>';
+    root.innerHTML = '<div style="font-size:12px;letter-spacing:3px;color:#758568">ISLA UNIVERSAL · MUNDO DE BLOQUES</div><h1 style="font:36px Georgia;margin:12px 0 8px">Biomas flotantes estilo Skyblock</h1><p style="margin:0 0 24px;color:#758568">Modelos 3D reales del juego · tierra y roca escalonadas hasta acabar en pico</p><div id="models" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px"></div>';
     for (const [resource, name] of resources) {
       const tile = map.tile({ id: 0, x: 0, z: 0, resource }); scene.add(tile); renderer.render(scene, camera);
       const figure = document.createElement('figure'); figure.style.cssText = 'margin:0;border:1px solid #dcded1;border-radius:12px;overflow:hidden;background:#f4f1e8';

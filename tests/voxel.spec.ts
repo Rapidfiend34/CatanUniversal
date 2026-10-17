@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { newGame, legalSettlements, legalRoads } from '../src/engine';
 
 const players = [{ name: 'Ana', bot: false }, { name: 'Luis', bot: false }, { name: 'Eva', bot: false }];
+// These scenarios rebuild detailed maps repeatedly using software WebGL in CI.
+test.setTimeout(90000);
 
 test('rebuilt voxel map preserves games across theme switches and allows real board construction', async ({ page }) => {
   const game = newGame(players);
@@ -41,7 +43,9 @@ test('mobile expanded voxel board renders, inspects tiles and keeps settings wit
   await page.goto('/');
   await expect(page.locator('#render-error')).toBeHidden();
   await expect(page.locator('#board')).toHaveAttribute('data-map-style', 'voxel');
-  const id = game.tiles.find(t => t.q === 0 && t.r === 0)!.id;
+  // Click a visible number badge. The randomly generated centre may be an
+  // unlabelled desert, whose projected clearing can be occluded by scenery.
+  const id = game.tiles.filter(t => t.number).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[0].id;
   const point = await page.evaluate(id => (window as any).__isla.project('tile', id), id);
   await page.mouse.click(point.x, point.y);
   await expect(page.locator('#tile-info')).toBeVisible();

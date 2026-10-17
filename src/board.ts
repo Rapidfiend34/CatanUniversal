@@ -28,6 +28,7 @@ export class Board {
   private mapScale = 1;
   private islandBase = new THREE.Group();
   private sea: THREE.ShaderMaterial;
+  private water: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private hovered: THREE.Object3D | null = null;
   private down = { x: 0, y: 0 };
   onSelect: (kind: string, id: number) => void = () => {};
@@ -55,7 +56,7 @@ export class Board {
     Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: .5, far: 35 });
     sun.shadow.bias = -.0003; sun.shadow.normalBias = .025; sun.shadow.radius = 4; this.scene.add(sun);
     this.sea = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uVoxel: { value: 0 } }, vertexShader: 'varying vec3 vPos; void main(){vPos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: `varying vec3 vPos; uniform float uTime; uniform float uVoxel; void main(){float d=length(vPos.xy); float wave=sin(d*9.-uTime*.6)*.5+.5; float ring=smoothstep(.91,1.,wave)*smoothstep(4.8,5.3,d)*(1.-smoothstep(5.5,8.,d)); vec3 a=vec3(.69,.80,.77); vec3 b=vec3(.84,.89,.85); float mixv=1.-exp(-d*.11); vec3 col=mix(a,b,mixv)+ring*.055; float w=sin(vPos.x*4.+uTime*.2)*sin(vPos.y*3.+uTime*.3); if(uVoxel > .5){vec2 p=floor(vPos.xy*8.)/8.; float rip=sin(p.x*2.+uTime*.25)*sin(p.y*3.+uTime*.2); col=mix(vec3(.63,.78,.80),vec3(.78,.87,.85),smoothstep(1.,12.,d))+rip*.012;} gl_FragColor=vec4(col+w*.005,1.);}` });
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), this.sea); water.rotation.x = -Math.PI / 2; water.position.y = -.28; this.scene.add(water);
+    this.water = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), this.sea); this.water.rotation.x = -Math.PI / 2; this.water.position.y = -.28; this.scene.add(this.water);
     const island = new THREE.Mesh(new THREE.CylinderGeometry(4.88, 5.10, .32, 72), mat('#c3b598')); island.position.y = -.06; island.receiveShadow = true; this.islandBase.add(island);
     const rim = new THREE.Mesh(new THREE.CylinderGeometry(4.96, 5.05, .075, 72), mat('#e4d7b7')); rim.position.y = .09; rim.receiveShadow = true; this.islandBase.add(rim); this.scene.add(this.islandBase);
     this.scene.add(this.ground, this.pieces, this.targets);
@@ -99,6 +100,7 @@ export class Board {
   create(g: Game) {
     const voxel = theme() === 'voxel', voxelMap = voxel ? new VoxelMap() : null;
     this.islandBase.visible = !voxel;
+    this.water.position.y = voxel ? -1.65 : -.28;
     this.sea.uniforms.uVoxel.value = voxel ? 1 : 0;
     this.renderer.toneMappingExposure = voxel ? .95 : 1.35;
     this.renderer.setClearColor(voxel ? '#cadeda' : '#dbe6df');
