@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { type Game, type Resource, legalRoads, legalSettlements } from './engine';
 import { theme } from './theme';
+import { voxelTexture } from './voxel-textures';
 
 export type Mode = 'inspect' | 'road' | 'settlement' | 'city';
 const terrain: Record<Resource | 'desert', string> = { wood: '#63876a', brick: '#c18d76', sheep: '#a4b58a', wheat: '#cfb578', ore: '#929c9d', desert: '#ddc49a' };
@@ -84,7 +85,8 @@ export class Board {
     this.disposeGroup(this.ground); this.selectionKey = '';
     for (const t of g.tiles) {
       const group = new THREE.Group(); group.position.set(t.x, 0, t.z); group.userData = { kind: 'tile', id: t.id }; this.ground.add(group);
-      this.mesh(new THREE.CylinderGeometry(.963, .963, .27, voxel ? 4 : 6), mat((voxel ? voxelTerrain : terrain)[t.resource]), group, 0, .27, 0);
+      const tileMaterial = voxel ? new THREE.MeshStandardMaterial({ map: voxelTexture(t.resource), roughness: .95 }) : mat(terrain[t.resource]);
+      this.mesh(new THREE.CylinderGeometry(.963, .963, .27, voxel ? 4 : 6), tileMaterial, group, 0, .27, 0);
       const rand = (n: number) => { const x = Math.sin(t.id * 171.3 + n * 37.17 + 1) * 43758.5453; return x - Math.floor(x); };
       for (let i = 0; i < (t.resource === 'ore' ? 5 : t.resource === 'wood' ? 9 : 7); i++) {
         const a = rand(i * 3) * Math.PI * 2, radius = .4 + rand(i * 3 + 1) * .29, x = Math.cos(a) * radius, z = Math.sin(a) * radius;
