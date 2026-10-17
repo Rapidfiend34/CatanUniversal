@@ -35,10 +35,10 @@ export function historyEntries(game: { log: readonly string[]; players: readonly
       if (text === `Turno de ${player.name}.` || text === `Construcción intermedia de ${player.name}: construye, compra desarrollo o pasa.`) tag('turns', [i]);
       game.players.forEach((other, j) => {
         if (i === j) return;
-        if (text === `${player.name} propone un intercambio a ${other.name}.` ||
-            text === `${other.name} acepta: ${player.name} intercambia recursos con ${other.name}.` ||
+        if (text === `${player.name} propone un intercambio a ${other.name}.`) tag('trade', [i, j]);
+        if (text === `${other.name} acepta: ${player.name} intercambia recursos con ${other.name}.` ||
             text === `${other.name} rechaza el intercambio de ${player.name}.` ||
-            text.startsWith(`${other.name} rechaza el intercambio de ${player.name}. `)) tag('trade', [i, j]);
+            text.startsWith(`${other.name} rechaza el intercambio de ${player.name}. `)) tag('trade', [j, i]);
         if (text === `${player.name} roba una carta a ${other.name}.`) tag('important', [i, j]);
       });
     });

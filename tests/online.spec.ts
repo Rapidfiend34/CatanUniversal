@@ -108,8 +108,10 @@ test('Party TV displays public board while phones control their own seats and re
     await page.screenshot({ path: 'test-results/party-tv-board.png' });
     await first.locator('[data-act="controller-view"]').click(); await expect(first.locator('body')).not.toHaveClass(/controller-focus/); await expect(first.locator('canvas')).toBeVisible();
     await first.locator('[data-act="controller-view"]').click(); await expect(first.locator('body')).toHaveClass(/controller-focus/);
-    await firstContext.setOffline(true); await expect(first.locator('.room-status')).toContainText('Reconectando', { timeout: 12000 });
+    await firstContext.setOffline(true); await expect(first.locator('.room-status')).toHaveAttribute('data-connection', 'offline', { timeout: 12000 });
+    await expect(first.locator('#connection-panel')).toContainText('Sin conexión a internet');
     await firstContext.setOffline(false); await expect(first.locator('.room-status')).toContainText('conectada', { timeout: 12000 });
+    await expect(first.locator('#connection-panel')).toBeHidden();
     await page.reload(); await expect.poll(async () => (await room(page))?.screen).toBe(true);
     expect((await room(page)).game!.players.every(p => total(p.hand) === 0)).toBe(true);
   } finally { await firstContext.close(); await secondContext.close(); }

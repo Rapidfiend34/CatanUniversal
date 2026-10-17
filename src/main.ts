@@ -5,7 +5,8 @@ import { validateSave } from './save';
 import { botCommand } from './bot';
 import { icon } from './icons';
 import QRCode from 'qrcode';
-import { RoomClient } from './online/client';
+import { RoomClient, RoomRequestError } from './online/client';
+import { roomNotice } from './online/notices';
 import type { RoomView, RoomMode } from './online/types';
 import { IslandAudio, gameSounds } from './audio';
 import { HISTORY_CATEGORIES, historyEntries, filterHistory, type HistoryFilter } from './history';
@@ -43,6 +44,7 @@ app.innerHTML = `
       <div class="render-error" id="render-error" hidden></div>
     </section>
   </main>
+  <aside id="connection-panel" class="connection-panel" role="status" aria-live="polite" hidden></aside>
   <div class="toast" id="toast" role="status" hidden></div>
   <div id="modal-root"></div>`;
 let board: Board | null = null;
@@ -57,7 +59,7 @@ function devCount(i: number) { return network.view?.game ? network.view.devCount
 function deckCount() { return network.view?.game ? network.view.deckCount : game.deck.length; }
 function playerPoints(i: number) { return network.view?.game ? network.view.scores[i] : points(game, i, i === humanViewIndex() || game.phase === 'finished'); }
 function dispatch(command: Command, automated = false) {
-  if (network.session) { if (!network.connected || network.busy) { if (!network.connected) toast('Reconectando con la sala. Espera un momento.'); return; } void network.command(command); return; }
+  if (network.session) { if (!network.connected || network.busy) { if (!network.connected) roomStatus(); return; } void network.command(command); return; }
   try {
     const previous = game, old = game.current, previousOffer = game.pendingTrade; game = execute(game, command); mode = 'inspect';
     if (command.type === 'robber') { selectedVictim = null; if (!automated && game.phase !== 'steal') toast('No hay rivales con cartas de recursos para robar en esta parcela.'); }
@@ -273,11 +275,20 @@ function fillQR(code: string) {
   void QRCode.toDataURL(inviteURL(), { width: 240, margin: 2, color: { dark: '#244e40', light: '#fffef8' } }).then(url => { qrCache.set(code, url); putImage(url); });
 }
 function roomStatus() {
-  const view = network.view, bar = document.querySelector<HTMLElement>('#network-bar')!;
+  const view = network.view, bar = document.querySelector<HTMLElement>('#network-bar')!, panel = document.querySelector<HTMLElement>('#connection-panel')!;
+  document.body.classList.toggle('network-room', !!network.session);
   document.body.classList.toggle('network-busy', network.busy); document.body.classList.toggle('room-disconnected', !!network.session && !network.connected);
   app.setAttribute('aria-busy', String(network.busy));
-  if (!view) { bar.hidden = true; return; } bar.hidden = false;
-  bar.innerHTML = `<div class="room-status"><i class="${network.connected ? 'live' : ''}"></i>${network.connected ? network.busy ? 'Sincronizando…' : 'Sala conectada' : 'Reconectando…'}</div><button class="room-code-pill" data-act="show-invite">${view.mode === 'party' ? 'PARTY' : 'ONLINE'} <b>${view.code}</b></button><span class="network-turn">${view.game ? ` ${isSecondary(view.game) ? 'Construye' : 'Turno de'} ${esc(view.game.players[view.game.current].name)}` : `${view.seats.length} de ${view.capacity} jugadores`}</span><div class="network-tools">${view.mode === 'party' && !view.screen ? `<button data-act="controller-view">${controllerFocus ? 'Ver tablero' : 'Solo mando'}</button>` : ''}${view.screen ? '<button data-act="fullscreen">Pantalla completa</button>' : ''}<button data-act="leave-room">Salir</button></div>`;
+  panel.hidden = !network.session || network.connected;
+  if (!panel.hidden) {
+    const title = network.connection === 'offline' ? 'Sin conexión a internet' : network.connection === 'unavailable' ? 'No se puede acceder a la sala' : 'Reconectando con la sala…';
+    const description = network.connection === 'unavailable' ? network.connectionMessage : network.connection === 'offline' ? 'Tu acceso se conserva en este navegador. Recuperaremos la partida al volver la conexión.' : network.connectionMessage || 'Estamos recuperando tu plaza y el estado de la partida. Espera antes de repetir una acción.';
+    const content = `<strong>${icon('compass', 19)} ${title}</strong><p>${esc(description)}</p>${network.lastSyncedAt ? `<small>Última sincronización: ${new Date(network.lastSyncedAt).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</small>` : ''}${network.retryAttempt ? `<small>Intento ${network.retryAttempt} de 3 · Reintentos automáticos</small>` : ''}<div>${network.connection !== 'unavailable' ? `<button class="outline-button small" data-act="retry-room" ${network.syncing ? 'disabled' : ''}>${network.syncing ? 'Reintentando…' : 'Reintentar ahora'}</button>` : ''}<button class="text-button" data-act="leave-room">Volver al juego local</button></div>`;
+    if (panel.innerHTML !== content) panel.innerHTML = content;
+  }
+  if (!network.session) { bar.hidden = true; return; } bar.hidden = false;
+  const label = network.connected ? network.busy ? 'Sincronizando…' : 'Sala conectada' : network.connection === 'offline' ? 'Sin internet' : network.connection === 'unavailable' ? 'Sala no disponible' : 'Reconectando…';
+  bar.innerHTML = `<div class="room-status" title="Conexión de este dispositivo" data-connection="${network.connection}"><i class="${network.connected ? 'live' : ''}"></i>${label}</div>${view ? `<button class="room-code-pill" data-act="show-invite">${view.mode === 'party' ? 'PARTY' : 'ONLINE'} <b>${view.code}</b></button><span class="network-turn">${view.game ? ` ${isSecondary(view.game) ? 'Construye' : 'Turno de'} ${esc(view.game.players[view.game.current].name)}` : `${view.seats.length} de ${view.capacity} jugadores${view.seats.length === view.capacity ? ' · Sala completa' : ''}`}</span>` : `<span class="room-code-pill">SALA <b>${esc(network.session.code)}</b></span>`}<div class="network-tools">${view?.mode === 'party' && !view.screen ? `<button data-act="controller-view">${controllerFocus ? 'Ver tablero' : 'Solo mando'}</button>` : ''}${view?.screen ? '<button data-act="fullscreen">Pantalla completa</button>' : ''}<button data-act="leave-room">Salir</button></div>`;
 }
 function showRooms() {
   modal('rooms', 'La isla se disfruta en compañía.', 'Elige cómo reuniros. Una sala, un código y vuestras propias cartas.', `<div class="room-mode-cards"><button data-act="create-online"><span class="room-mode-icon">${icon('person', 32)}</span><strong>Online</strong><p>Crea una sala y juega con amigos desde cualquier lugar.</p><span>Crear sala ${icon('arrow', 16)}</span></button><button data-act="create-party"><span class="room-mode-icon">${icon('island', 32)}</span><strong>Party · TV</strong><p>El tablero en la televisión. Cada móvil es un mando privado.</p><span>Preparar televisión ${icon('arrow', 16)}</span></button></div><button class="primary-button full" data-act="join-room">Tengo un código · Unirme a una sala ${icon('arrow', 18)}</button>`, true);
@@ -286,11 +297,16 @@ function showCreateRoom(mode: RoomMode) { modal('create-room', mode === 'party' 
 function showJoinRoom(code = '') { modal('join-room', 'Tu sitio en la isla te espera.', 'Introduce el código compartido por tu amigo o por la pantalla de televisión.', `<form id="join-room-form"><label class="field-label">CÓDIGO DE LA SALA<input class="room-code-input" name="code" value="${esc(code)}" maxlength="7" minlength="7" pattern="[A-Za-z2-9]{7}" autocomplete="off" autocapitalize="characters" required placeholder="ABC2345"></label><label class="field-label">TU NOMBRE<input name="name" maxlength="22" autocomplete="nickname" required placeholder="¿Cómo te llamas?"></label><button class="primary-button full" type="submit">Unirme a la sala ${icon('arrow', 18)}</button></form>`); }
 async function openRoom(form: HTMLFormElement, fn: () => Promise<unknown>) {
   if (roomOpening) return; roomOpening = true; const button = form.querySelector<HTMLButtonElement>('button[type="submit"]'); if (button) button.disabled = true;
-  try { await fn(); } catch (e) { toast((e as Error).message); } finally { roomOpening = false; if (button) button.disabled = false; }
+  try { await fn(); } catch (e) {
+    if (e instanceof RoomRequestError && e.status === 409 && e.message === 'La sala está completa.') modal('room-full', 'La sala está completa.', 'Todas las plazas de esta sala ya están ocupadas.', `<div class="empty-state">${icon('person', 40)}<p>Pide al anfitrión que prepare una sala con más plazas o utiliza otro código. En Party, la televisión no ocupa plaza.</p></div><button class="primary-button full" data-act="join-room">Probar otro código ${icon('arrow', 18)}</button><button class="text-button full" data-act="rooms">Crear otra sala</button>`);
+    else toast((e as Error).message);
+  } finally { roomOpening = false; if (button) button.disabled = false; }
 }
 function showLobby(view: RoomView) {
   const self = view.self === null ? null : view.seats[view.self], canStart = view.seats.length >= 2 && view.seats.every(s => s.ready);
+  const free = view.capacity - view.seats.length, waiting = view.seats.filter(s => !s.ready).length;
   modal('lobby', view.mode === 'party' ? 'Todos al sofá. La isla os espera.' : 'Vuestra próxima aventura empieza aquí.', view.screen ? 'Escanead el QR con vuestros móviles. La televisión muestra el tablero; las cartas se quedan en cada dispositivo.' : 'Comparte el código. Cuando estéis todos, marcaos como listos para comenzar.', `
+    <div class="lobby-capacity ${free ? '' : 'full'}" role="status"><strong>${icon('person', 19)} ${free ? `${view.seats.length} de ${view.capacity} plazas ocupadas` : `Sala completa · ${view.capacity} de ${view.capacity} jugadores`}</strong><p>${free ? `${free} ${free === 1 ? 'plaza libre' : 'plazas libres'}. Las plazas vacías se completarán con IA al empezar.` : waiting ? `Falta confirmar a ${waiting} ${waiting === 1 ? 'jugador' : 'jugadores'} antes de empezar.` : 'Todos están listos. El anfitrión puede empezar la partida.'}</p></div>
     <div class="lobby-grid"><div class="lobby-invite"><span class="eyebrow">CÓDIGO DE LA SALA</span><strong class="lobby-code" data-room-code="${view.code}">${view.code}</strong><img class="room-qr" data-room="${view.code}" alt="QR para unirse a la sala ${view.code}" width="210" height="210"><button class="outline-button small" data-act="copy-invite">Copiar invitación ${icon('arrow', 14)}</button><p>Sin instalar aplicaciones.<br>Abre la invitación en tu navegador.</p></div><div class="lobby-players"><div class="section-label">${view.variant === 'expanded' ? 'EXPEDICIÓN AMPLIADA' : 'VUESTRA EXPEDICIÓN'} <span>${view.seats.length} / ${view.capacity}</span></div>${Array.from({ length: view.capacity }, (_, i) => { const s = view.seats[i]; return `<div class="lobby-seat"><span style="color:${s?.color || '#a1ac94'}">${icon(s ? 'person' : 'bot', 23)}</span><div><strong>${s ? esc(s.name) : 'Plaza libre'}</strong><small>${s ? s.ready ? 'Listo para zarpar' : 'Preparándose…' : 'Se completará con IA si queda libre'}</small></div><i class="${s?.ready ? 'ready' : ''}">${s ? s.ready ? '✓' : '·' : '+'}</i></div>`; }).join('')}${self ? `<button class="${self.ready ? 'outline-button' : 'primary-button'} full" data-act="room-ready">${self.ready ? 'Ya estás listo · Cambiar' : 'Estoy listo'} ${icon('arrow', 17)}</button>` : ''}${view.isHost ? `<button class="primary-button full" data-act="room-start" ${canStart ? '' : 'disabled'}>Empezar partida ${icon('arrow', 18)}</button>` : '<p class="form-note">El anfitrión empezará cuando estéis listos.</p>'}<p class="form-note">Mínimo dos personas. Las plazas se cierran al comenzar. Puedes recargar este mismo navegador para recuperar tu sitio.</p></div></div><div class="lobby-footer">${view.screen ? '<button class="text-button" data-act="fullscreen">Pantalla completa</button>' : ''}<button class="text-button" data-act="leave-room">Volver al juego local</button></div>`, true, true);
   fillQR(view.code);
 }
@@ -302,8 +318,10 @@ function leaveRoom() {
   board?.create(game); render(); scheduleBot();
 }
 network.onStatus = roomStatus;
-network.onError = message => { toast(message); void network.sync(); };
-network.onUpdate = (view: RoomView) => {
+network.onRecovered = () => toast('Conexión recuperada. Tu partida está sincronizada.');
+network.onError = message => { if (network.connected) toast(message); else roomStatus(); void network.sync(); };
+network.onUpdate = (view: RoomView, previousView: RoomView | null) => {
+  const notice = roomNotice(previousView, view); if (notice) toast(notice);
   const different = receivedRoomCode !== view.code; document.body.classList.add('network-room'); document.body.classList.toggle('tv-screen', view.screen); document.body.classList.toggle('controller-focus', view.mode === 'party' && !view.screen && controllerFocus);
   window.clearTimeout(botTimer); passTo = null; roomStatus();
   if (different) {
@@ -343,6 +361,7 @@ app.addEventListener('click', e => {
     case 'room-start': void network.send({ op: 'start' }); break;
     case 'show-invite': showInvite(); break;
     case 'leave-room': leaveRoom(); break;
+    case 'retry-room': void network.sync(); break;
     case 'copy-invite': if (network.view) { if (navigator.clipboard) void navigator.clipboard.writeText(inviteURL()).then(() => toast('Invitación copiada. Compártela con tus amigos.')).catch(() => toast(inviteURL())); else toast(inviteURL()); } break;
     case 'fullscreen': if (document.fullscreenElement) void document.exitFullscreen(); else if (document.documentElement.requestFullscreen) void document.documentElement.requestFullscreen().catch(() => toast('Usa el modo de pantalla completa de tu navegador.')); break;
     case 'controller-view': controllerFocus = !controllerFocus; document.body.classList.toggle('controller-focus', controllerFocus); roomStatus(); break;
@@ -412,4 +431,3 @@ render(); scheduleBot();
 const requestedRoom = new URL(location.href).searchParams.get('room');
 if (requestedRoom) { if (new URL(location.href).searchParams.get('screen') === 'tv') document.body.classList.add('tv-screen'); void network.restore(requestedRoom.toUpperCase(), new URL(location.href).searchParams.get('screen') === 'tv').then(restored => { if (!restored) showJoinRoom(requestedRoom); }).catch(e => { toast((e as Error).message); showJoinRoom(requestedRoom); }); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && network.session) void network.sync(); });
-window.addEventListener('online', () => { if (network.session) void network.sync(); });

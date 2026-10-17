@@ -151,6 +151,8 @@ El mismo flujo se aplica a los caballeros y conserva la fase de dados si se jueg
 
 Las salas duran **48 horas desde su creación**. Conserva los datos del sitio para recuperar tu acceso. Después de empezar solo pueden volver los participantes originales; si alguien se desconecta, la partida espera sus acciones. No hay sustitución automática ni migración del anfitrión.
 
+La barra de Online y Party indica la conexión de tu dispositivo. Si se pierde internet o el servidor tarda, aparece un panel con reintentos automáticos y la opción **Reintentar ahora**; al recuperar la conexión se confirma la sincronización. Tu acceso se conserva al recargar, incluso si la API no responde en ese momento. Las salas caducadas o los accesos no válidos muestran una explicación. Los avisos de actividad muestran acciones públicas de otros jugadores y el vestíbulo confirma cuándo están ocupadas todas las plazas, sin contar la TV como jugador.
+
 La pantalla de traspaso local es una medida de cortesía: la partida completa reside en el navegador. En Online y Party, el servidor valida las reglas y oculta las manos ajenas antes de enviarlas.
 
 ## Para desarrollar
