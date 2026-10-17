@@ -184,7 +184,9 @@ export class Board {
     for (const e of g.edges) if (e.owner !== null) {
       const a = g.vertices[e.a], b = g.vertices[e.b];
       if (bridges) {
-        const bridge = bridges.bridge(g.players[e.owner].color);
+        const angle = Math.atan2(b.z - a.z, b.x - a.x);
+        const landing = (v: typeof a) => v.owner === null ? 'junction' as const : v.city ? 'city' as const : 'settlement' as const;
+        const bridge = bridges.bridge(g.players[e.owner].color, angle, [landing(a), landing(b)]);
         bridge.userData = { edge: e.id, owner: e.owner };
         bridge.position.set((a.x + b.x) / 2, .43, (a.z + b.z) / 2); bridge.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
         this.pieces.add(bridge); junctions.add(e.a); junctions.add(e.b); continue;

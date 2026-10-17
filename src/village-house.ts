@@ -1,5 +1,6 @@
 import { BoxGeometry, Color, Group, InstancedMesh, Matrix4, MeshStandardMaterial, type Material } from 'three';
 import { VoxelMaterials } from './voxel-materials';
+import { islandCells } from './skyblock-connections';
 
 type Part = { x: number; y: number; z: number; w: number; h: number; d: number; tint?: Color };
 // Shared surface maps for all buildings in one Board.update. Each house uses
@@ -79,9 +80,8 @@ export class VillageHouses {
     // lowest stone sits above road height, keeping the board's edges clear.
     const houseLift = .30;
     for (const parts of batches.values()) for (const part of parts) part.y += houseLift;
-    for (let x = -2; x <= (city ? 3 : 2); x++) for (let z = -2; z <= 2; z++) {
-      if (Math.abs(x) === 2 && Math.abs(z) === 2 || x === 3 && Math.abs(z) > 1) continue;
-      block('grass', x * .09, .245, z * .09, .09, .055, .09);
+    for (const { x, z, size } of islandCells(city ? 'city' : 'settlement')) {
+      block('grass', x, .245, z, size, .055, size);
     }
     // Individual soil cubes keep the pixel texture square on the exposed sides.
     const columns = city ? 5 : 4;

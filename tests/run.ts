@@ -4,3 +4,4 @@ import './expanded.test.ts';
 import './audio.test.ts';
 import './history.test.ts';
 import './notices.test.ts';
+import './skyblock-connections.test.ts';
