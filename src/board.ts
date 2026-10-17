@@ -94,8 +94,17 @@ export class Board {
         block(0, .08, 0, 1.72, .16, 1.72, base);
         block(0, -.04, 0, 1.48, .08, 1.48, '#394f45');
         if (t.resource === 'wood') {
-          for (const x of [-.48, .35]) { block(x, .56, -.18, .16, .7, .16, '#65452f'); block(x, .96, -.18, .48, .24, .48, '#2f6b3d'); block(x + .08, 1.15, -.18, .32, .2, .32, '#43884a'); }
-          block(.42, .48, .38, .34, .18, .34, '#7c5b3b');
+          block(0, .30, -.1, 1.28, .22, 1.12, '#6fa044');
+          block(.18, .48, -.08, .88, .18, .82, '#8dbb50');
+          for (const [x, z, s] of [[-.48, -.32, .82], [.12, -.18, 1.18], [.5, .32, .72], [-.28, .42, .62]]) {
+            block(x, .62, z, .14, s, .14, '#68452e');
+            block(x, .98 + s / 2, z, .42, .34, .42, '#2d713d');
+            block(x + .12, 1.18 + s / 2, z, .3, .28, .3, '#438e48');
+            block(x - .14, 1.08 + s / 2, z + .12, .26, .25, .26, '#367e40');
+          }
+          block(.36, .48, .42, .42, .2, .18, '#805536'); block(.58, .58, .42, .42, .2, .18, '#9b6841');
+          block(-.58, .48, .3, .2, .32, .2, '#7a5132'); block(-.58, .66, .3, .24, .05, .24, '#c69655');
+          for (const [x, z] of [[-.7, -.36], [.7, -.12], [-.72, .48], [.62, .58]]) { block(x, .48, z, .1, .28, .1, '#6eaa45'); block(x + .08, .62, z, .16, .1, .16, '#9bca55'); }
         } else if (t.resource === 'brick') {
           block(-.35, .48, -.28, .6, .42, .5, '#a65d4c'); block(.28, .58, -.12, .5, .62, .42, '#b86d54');
           block(.03, .86, -.12, .78, .12, .56, '#754940'); block(-.38, .35, .32, .18, .18, .18, '#d18b64');
@@ -114,7 +123,7 @@ export class Board {
       }
       for (let i = 0; i < (t.resource === 'ore' ? 5 : t.resource === 'wood' ? 9 : 7); i++) {
         const a = rand(i * 3) * Math.PI * 2, radius = .4 + rand(i * 3 + 1) * .29, x = Math.cos(a) * radius, z = Math.sin(a) * radius;
-        if (t.resource === 'wood') {
+        if (t.resource === 'wood' && !voxel) {
           const h = .3 + rand(i + 50) * .3;
           this.mesh(new THREE.CylinderGeometry(.025, .04, h, 5), mat('#756449'), group, x, .42 + h / 2, z);
           this.mesh(voxel ? new THREE.BoxGeometry(.28, h, .28) : new THREE.ConeGeometry(.15, h, 6), mat(i % 2 ? '#345b44' : '#436e4b'), group, x, .55 + h / 2, z);
