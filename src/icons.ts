@@ -1,3 +1,6 @@
+import { theme } from './theme';
+import { voxelResourceIcon } from './voxel-icons';
+
 const paths: Record<string, string> = {
   island: '<path d="m3 16 6-10 5 7 3-5 5 8H3Z"/><path d="M2 20c3-2 4 2 7 0s4 2 7 0 4 2 7 0"/>',
   cube: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
@@ -26,4 +29,4 @@ const paths: Record<string, string> = {
   save: '<path d="M4 3h13l4 4v14H3V3h1Zm3 0v6h10V3M7 21v-8h10v8"/>',
   leaf: '<path d="M20 3C5 1 1 11 7 17S23 16 20 3ZM4 22l12-14"/>',
 };
-export const icon = (name: string, size = 20) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.island}</svg>`;
+export const icon = (name: string, size = 20) => (theme() === 'voxel' ? voxelResourceIcon(name, size) : null) ?? `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.island}</svg>`;
