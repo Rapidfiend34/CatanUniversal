@@ -17,3 +17,4 @@
 @media(max-width:620px){.expanded-game .sidebar{overflow:hidden}.expanded-game .players{overflow-x:auto;padding:6px 2px;scroll-snap-type:x proximity}.expanded-game .player{min-width:115px;scroll-snap-align:start}.bank-stock{font-size:7px}.resource-card>span:last-of-type{margin-top:6px}.controller-focus .resource-card>span:last-of-type{margin-top:8px}}
 
 .public-bank{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:15px;padding-top:12px;border-top:1px solid #dce2cf;font-size:10px;color:#6e7f68}.public-bank>span{display:inline-flex;align-items:center;gap:3px}.public-bank>span:first-child{width:100%;font-size:8px;letter-spacing:1px}
+.offer-hand{margin-top:18px}.offer-hand h3{font-size:11px;color:#6e7f68}.offer-hand .trade-chips{margin-bottom:18px}

@@ -174,13 +174,35 @@ test('human can select an AI, get an accepted offer, and receive a strategic rej
 test('AI proposal waits for the human across reload and a refusal transfers no cards',async({page})=>{
   await page.goto('/');let g=aiTradingGame();g.current=1;g=execute(g,botCommand(g));expect(g.pendingTrade?.to).toBe(0);
   await importGame(page,g,true);await expect(page.getByRole('dialog')).toContainText('Mateo te propone');
+  const hand = page.getByRole('region', { name: 'Tus recursos disponibles' });
+  await expect(hand.locator('.trade-chip')).toHaveText(['1 Madera', '0 Arcilla', '0 Lana', '0 Trigo', '2 Mineral']);
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toBeVisible();
   await page.reload();await expect(page.getByRole('dialog')).toContainText('La partida espera tu decisión');
+  await expect(hand.locator('.trade-chip')).toHaveText(['1 Madera', '0 Arcilla', '0 Lana', '0 Trigo', '2 Mineral']);
   await page.waitForTimeout(1200);expect((await state(page)).pendingTrade).toEqual(g.pendingTrade);
   await page.getByRole('button',{name:'Rechazar oferta',exact:true}).click();const after=await state(page);
   expect(after.pendingTrade).toBeNull();expect(after.players.map(p=>p.hand)).toEqual(g.players.map(p=>p.hand));expect(after.current).toBe(1);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(async()=>(await state(page)).current).not.toBe(1);
+});
+
+test('incoming trade shows all recipient resources on mobile without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let g = aiTradingGame(); g.current = 1;
+  g = execute(g, { type: 'offer', player: 0, give: { ...emptyHand(), wood: 1 }, receive: { ...emptyHand(), ore: 1 } });
+  await page.addInitScript(saved => localStorage.setItem('isla-universal-v1', saved), JSON.stringify(g));
+  await page.goto('/');
+  const hand = page.getByRole('region', { name: 'Tus recursos disponibles' });
+  await expect(hand.locator('.trade-chip')).toHaveText(['1 Madera', '0 Arcilla', '0 Lana', '0 Trigo', '2 Mineral']);
+  await hand.scrollIntoViewIfNeeded();
+  await expect(hand).toBeVisible();
+  expect(await hand.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect((await state(page)).players.map(p => p.hand)).toEqual(g.players.map(p => p.hand));
+  await page.getByRole('button', { name: 'Aceptar intercambio' }).click();
+  const after = await state(page);
+  expect(after.pendingTrade).toBeNull();
+  expect(after.players[0].hand.wood).toBe(2);
+  expect(after.players[0].hand.ore).toBe(1);
 });
 
 test('AI initiates a trade on its turn and resumes building after human acceptance',async({page})=>{
