@@ -32,6 +32,16 @@ npm run test:e2e
 
 La configuración de Playwright usa `/usr/bin/chromium`, disponible en este entorno cloud. En otra máquina indica el ejecutable con `CHROMIUM_PATH=/ruta/al/chromium npm run test:e2e`. Las capturas y trazas se guardan en `test-results/`, excluido de Git. La escena requiere WebGL; para equipos sin WebGL hay un aviso y un selector alternativo de construcciones.
 
+### PWA y pruebas sin conexión
+
+`npm run test:pwa` compila la aplicación y levanta temporalmente `vite preview` en el puerto 4173 para validar la versión de producción con Chromium. Es una suite separada del servidor de desarrollo: el service worker no se registra en `npm run dev`, para no cachear módulos de desarrollo. También puedes ejecutar `npm run build` y `npm run preview -- --port 4173` para una comprobación manual.
+
+`vite.config.ts` genera `dist/sw.js` con una lista de recursos y una versión derivada de su contenido. La caché guarda únicamente el HTML y los archivos estáticos conocidos; excluye `/api/`, otros orígenes, peticiones autenticadas y operaciones de escritura. La instalación debe descargar todos los recursos para activarse. Un worker nuevo espera la confirmación desde la interfaz; las cachés anteriores de Isla Universal se eliminan tras activar la nueva versión y se conservan las de otras aplicaciones. El guardado local sigue en `localStorage`, separado de esa caché.
+
+Los iconos PNG de 192/512 píxeles, el icono maskable y el Apple touch icon de 180 píxeles están versionados en `public/icons/`, junto a su SVG de referencia. `public/manifest.webmanifest` define el inicio local en `/` y la apertura independiente. En iPhone la instalación se hace manualmente desde Safari; la prueba de esa guía usa un móvil simulado y no sustituye una comprobación en un iPhone físico.
+
+En producción publica la raíz completa del repositorio con HTTPS para conservar la API de Online/Party. `vercel.json` evita cachear de forma persistente el worker y el manifiesto. Subir código a GitHub no publica por sí solo una nueva versión del sitio.
+
 El entorno cloud ya está aislado: utiliza este checkout existente. No hace falta crear un worktree salvo petición expresa.
 
 ## Despliegue en Vercel

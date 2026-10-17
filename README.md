@@ -155,6 +155,19 @@ La barra de Online y Party indica la conexión de tu dispositivo. Si se pierde i
 
 La pantalla de traspaso local es una medida de cortesía: la partida completa reside en el navegador. En Online y Party, el servidor valida las reglas y oculta las manos ajenas antes de enviarlas.
 
+## Instalar en Windows, Android o iPhone
+
+Abre el juego publicado con **HTTPS** y entra en **Ajustes → Instalar Isla Universal**.
+
+- **Windows y Android:** utiliza Chrome o Edge y confirma la instalación cuando el navegador la ofrezca. También puedes buscar «Instalar aplicación» en su menú.
+- **iPhone y iPad:** abre la web en Safari, pulsa **Compartir → Añadir a pantalla de inicio → Añadir**. Después abre el juego desde su icono para empezar y guardar allí tus partidas.
+
+Con internet, espera el mensaje **«Listo para jugar sin conexión»** en Ajustes. A partir de entonces puedes volver a abrir la aplicación, jugar Solo contra la IA o compartir el dispositivo en modo Local sin conexión. El tablero, los iconos y el audio están incluidos. **Online y Party siguen necesitando internet**; los datos de salas y las respuestas de la API nunca se guardan en esta caché.
+
+Cuando haya una versión nueva aparecerá un aviso. Puedes seguir jugando y actualizar más tarde; **Guardar y actualizar** guarda la partida local antes de recargar. Las partidas y las preferencias pertenecen a los datos de esta instalación/navegador: conservándolos podrás continuar tus partidas. Exporta los guardados importantes desde Ajustes para tener una copia.
+
+La instalación y la caché se preparan con la versión compilada, no con el servidor de desarrollo. La publicación en la web es un paso separado de subir cambios a GitHub.
+
 ## Para desarrollar
 
 Requiere **Node.js 24** y npm. En desarrollo, las salas se guardan en archivos locales y no necesitan credenciales externas.
@@ -173,6 +186,7 @@ Abre **http://localhost:5173**.
 | `npm test` | Reglas, integración del servidor y partidas completas de IA. |
 | `npm run build` | Comprueba TypeScript del cliente y servidor y genera `dist/`. |
 | `npm run test:e2e` | Prueba la interfaz con navegadores independientes y móviles simulados. |
+| `npm run test:pwa` | Compila y comprueba iconos, apertura offline, instalación y actualizaciones con un service worker real. |
 
 **[Guía técnica y arquitectura →](docs/DEVELOPMENT.md)**
 

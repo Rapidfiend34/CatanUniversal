@@ -10,9 +10,11 @@ import { roomNotice } from './online/notices';
 import type { RoomView, RoomMode } from './online/types';
 import { IslandAudio, gameSounds } from './audio';
 import { HISTORY_CATEGORIES, historyEntries, filterHistory, type HistoryFilter } from './history';
+import { IslandPWA } from './pwa';
 
 const SAVE_KEY = 'isla-universal-v1';
 const network = new RoomClient();
+const pwa = new IslandPWA();
 let receivedGameVersion = -1, receivedRoomCode = '', roomOpening = false, controllerFocus = true;
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 let game: Game;
@@ -45,6 +47,7 @@ app.innerHTML = `
     </section>
   </main>
   <aside id="connection-panel" class="connection-panel" role="status" aria-live="polite" hidden></aside>
+  <aside id="pwa-update-banner" class="pwa-update-banner" aria-label="Actualización del juego" hidden><strong>Hay una versión nueva de Isla Universal.</strong><p>Tu partida continúa. Actualiza cuando te venga bien.</p><div><button class="outline-button small" data-act="pwa-update">Ver actualización</button><button class="text-button" data-act="pwa-dismiss">Más tarde</button></div></aside>
   <div class="toast" id="toast" role="status" hidden></div>
   <div id="modal-root"></div>`;
 let board: Board | null = null;
@@ -258,13 +261,33 @@ function audioSettings() {
     return `<button class="setting-row" data-act="${channel === 'effects' ? 'sound' : 'music'}" aria-pressed="${enabled}">${icon('sound', 23)}<span>${label}<small>${channel === 'effects' ? 'Dados, construcciones, intercambios y avisos' : 'Una melodía suave para acompañar la partida'}</small></span><b>${enabled ? 'Activado' : 'Activar'}</b></button><label class="audio-volume"><span>Volumen de ${channel === 'effects' ? 'efectos' : 'música'}</span><input type="range" min="0" max="100" step="1" value="${volume}" data-audio-volume="${channel}" aria-label="Volumen de ${channel === 'effects' ? 'efectos' : 'música'}"><output>${volume}%</output></label>`;
   }).join('')}<p class="form-note">El audio comienza al interactuar y se pausa al ocultar la pestaña. Tus preferencias se guardan en este navegador.</p></section>`;
 }
+function pwaSettings() {
+  const status = pwa.status === 'ready' ? 'Listo para jugar sin conexión: Solo y multijugador local.' : pwa.status === 'downloading' ? 'Descargando el juego para poder abrirlo sin conexión…' : pwa.status === 'error' ? 'No se pudo completar la descarga. Vuelve a abrir el juego con internet para reintentar.' : 'Abre la versión publicada con HTTPS para preparar el juego sin conexión.';
+  return `<section id="pwa-settings" class="pwa-settings" aria-label="Instalación y juego sin conexión"><h3>Tu isla, siempre a mano</h3><p class="pwa-offline-status" role="status">${status}</p><button class="setting-row" data-act="pwa-install">${icon('island', 23)}<span>${pwa.installed ? 'Aplicación instalada' : 'Instalar Isla Universal'}<small>${pwa.installed ? 'Ya la estás usando como aplicación independiente' : pwa.apple ? 'iPhone y iPad: Safari → Compartir → Añadir a pantalla de inicio' : 'Añádela a tus aplicaciones o a la pantalla de inicio'}</small></span>${icon('arrow', 18)}</button>${pwa.updateAvailable ? '<button class="setting-row" data-act="pwa-update"><span>Actualización disponible<small>Recarga cuando quieras aplicar la nueva versión</small></span></button>' : ''}<p class="form-note">Online y Party necesitan internet. Las partidas locales se guardan en este navegador. Puedes exportarlas para conservar una copia.</p></section>`;
+}
+function updatePwaUI() {
+  const banner = document.querySelector<HTMLElement>('#pwa-update-banner');
+  if (banner) banner.hidden = !pwa.updateAvailable || pwa.updateDismissed;
+  const settings = document.querySelector('#pwa-settings'); if (settings) settings.outerHTML = pwaSettings();
+}
+pwa.onChange = updatePwaUI;
+async function installPwa() {
+  const result = await pwa.install();
+  if (result === 'accepted') { toast('Sigue las indicaciones del navegador para instalar Isla Universal.'); return; }
+  if (result === 'dismissed') return;
+  modal('pwa-install', 'Tu isla, en tu dispositivo.', 'Instala Isla Universal desde la web publicada con HTTPS.', `<div class="pwa-install-guide"><h3>${pwa.apple ? 'En iPhone o iPad' : 'En Windows o Android'}</h3><ol>${pwa.apple ? '<li>Abre el juego en Safari.</li><li>Pulsa Compartir.</li><li>Selecciona Añadir a pantalla de inicio y confirma con Añadir.</li>' : '<li>Abre el juego en Chrome o Edge.</li><li>Busca Instalar Isla Universal o Instalar aplicación en el menú del navegador o en la barra de direcciones.</li><li>Confirma para abrirla desde tus aplicaciones.</li>'}</ol><p>Ábrela una vez con internet y espera el mensaje «Listo para jugar sin conexión» en Ajustes. Después podrás jugar Solo o en el mismo dispositivo sin conexión.</p><p>Online y Party requieren internet. En iPhone, abre la aplicación instalada para iniciar y guardar allí tus partidas.</p></div><button class="primary-button full" data-act="settings">Volver a Ajustes</button>`);
+}
+function showPwaUpdate() {
+  if (!pwa.updateAvailable) return;
+  modal('pwa-update', 'Una nueva versión de tu isla.', 'La actualización recargará el juego cuando tú lo confirmes.', `<p class="form-note">Tu partida local se guarda antes de recargar. En Online y Party se recupera tu plaza desde este mismo navegador. Espera a que termine cualquier acción que estés enviando.</p><button class="primary-button full" data-act="pwa-apply">Guardar y actualizar</button><button class="text-button full" data-act="pwa-later">Seguir jugando</button>`);
+}
 function showSettings() {
   const historyLink = `<button class="setting-row" data-act="log">${icon('compass', 23)}<span>Historial de la partida<small>Filtra por jugador, construcciones, intercambios y eventos importantes</small></span>${icon('arrow', 18)}</button>`;
   if (network.session) {
-    modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`);
+    modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `${pwaSettings()}${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`);
     return;
   }
-  modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`);
+  modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `${pwaSettings()}${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`);
 }
 
 const qrCache = new Map<string, string>();
@@ -368,6 +391,11 @@ app.addEventListener('click', e => {
     case 'help': showHelp(); break;
     case 'new': showNew(); break;
     case 'settings': showSettings(); break;
+    case 'pwa-install': void installPwa(); break;
+    case 'pwa-update': showPwaUpdate(); break;
+    case 'pwa-dismiss': pwa.dismissUpdate(); break;
+    case 'pwa-later': pwa.dismissUpdate(); closeModal(); render(); break;
+    case 'pwa-apply': if (network.busy || roomOpening) { toast('Espera a que termine la acción antes de actualizar.'); break; } if (!network.session) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch { toast('No se pudo guardar la partida. Expórtala antes de actualizar.'); break; } } pwa.applyUpdate(); break;
     case 'close-modal': if (network.session ? activeModal !== 'lobby' && activeModal !== 'robbery' && activeModal !== 'discard' && activeModal !== 'offer-pending' : passTo === null && game.phase !== 'discard' && game.phase !== 'steal' && !game.pendingTrade) closeModal(); break;
     case 'robbery': showRobbery(); break;
     case 'close-tile': document.querySelector<HTMLElement>('#tile-info')!.hidden = true; break;
@@ -428,6 +456,7 @@ document.addEventListener('keydown', e => {
 // A read-only diagnostic surface also enables real pointer-based browser tests.
 Object.defineProperty(window, '__isla', { value: { get state() { return structuredClone(game); }, get room() { return network.view ? structuredClone(network.view) : null; }, project: (kind: string, id: number) => board?.project(kind, id) } });
 render(); scheduleBot();
+pwa.start();
 const requestedRoom = new URL(location.href).searchParams.get('room');
 if (requestedRoom) { if (new URL(location.href).searchParams.get('screen') === 'tv') document.body.classList.add('tv-screen'); void network.restore(requestedRoom.toUpperCase(), new URL(location.href).searchParams.get('screen') === 'tv').then(restored => { if (!restored) showJoinRoom(requestedRoom); }).catch(e => { toast((e as Error).message); showJoinRoom(requestedRoom); }); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && network.session) void network.sync(); });
