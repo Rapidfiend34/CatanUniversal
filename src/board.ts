@@ -5,6 +5,7 @@ import { type Game, type Resource, legalRoads, legalSettlements } from './engine
 import { theme } from './theme';
 import { VoxelMap, BIOME_TOKEN, BIOME_ROBBER } from './voxel-map';
 import { createIllager } from './illager';
+import { VillageHouses } from './village-house';
 
 export type Mode = 'inspect' | 'road' | 'settlement' | 'city';
 const terrain: Record<Resource | 'desert', string> = { wood: '#63876a', brick: '#c18d76', sheep: '#a4b58a', wheat: '#cfb578', ore: '#929c9d', desert: '#ddc49a' };
@@ -174,6 +175,7 @@ export class Board {
   }
   update(g: Game, mode: Mode, interactive: boolean, numbered = false) {
     const voxel = theme() === 'voxel';
+    const houses = voxel ? new VillageHouses() : null;
     this.lastGame = g; this.lastMode = mode; this.disposeGroup(this.pieces); this.disposeGroup(this.targets);
     for (const e of g.edges) if (e.owner !== null) {
       const a = g.vertices[e.a], b = g.vertices[e.b];
@@ -183,17 +185,13 @@ export class Board {
     for (const v of g.vertices) if (v.owner !== null) {
       const group = new THREE.Group(); group.position.set(v.x, .43, v.z); group.rotation.y = Math.PI / 6; this.pieces.add(group);
       const color = g.players[v.owner].color;
+      if (houses) { group.add(houses.create(color, v.city)); continue; }
       this.mesh(new THREE.BoxGeometry(.23, .22, .24), mat(color), group, 0, .11, 0);
-      if (voxel) {
-        this.mesh(new THREE.BoxGeometry(.31, .07, .30), mat('#745534'), group, 0, .25, 0);
-        this.mesh(new THREE.BoxGeometry(.21, .07, .30), mat('#8b673e'), group, 0, .32, 0);
-        this.mesh(new THREE.BoxGeometry(.10, .06, .30), mat('#a17b48'), group, 0, .385, 0);
-      } else { const roof = this.mesh(new THREE.ConeGeometry(.235, .18, 4), mat(color), group, 0, .30, 0); roof.rotation.y = Math.PI / 4; roof.scale.z = .85; }
+      const roof = this.mesh(new THREE.ConeGeometry(.235, .18, 4), mat(color), group, 0, .30, 0); roof.rotation.y = Math.PI / 4; roof.scale.z = .85;
       this.mesh(new THREE.BoxGeometry(.055, .09, .01), mat('#fff0ce'), group, 0, .07, .126);
       if (v.city) {
         this.mesh(new THREE.BoxGeometry(.15, .37, .18), mat(color), group, .17, .185, 0);
-        if (voxel) this.mesh(new THREE.BoxGeometry(.20, .07, .22), mat('#b7b9a6'), group, .17, .405, 0);
-        else this.mesh(new THREE.ConeGeometry(.15, .14, 4), mat('#eee2c1'), group, .17, .44, 0).rotation.y = Math.PI / 4;
+        this.mesh(new THREE.ConeGeometry(.15, .14, 4), mat('#eee2c1'), group, .17, .44, 0).rotation.y = Math.PI / 4;
         this.mesh(new THREE.BoxGeometry(.04, .06, .01), mat('#fff0ce'), group, .17, .28, .096);
       }
     }
