@@ -14,7 +14,7 @@ export class VillageHouses {
   create(playerColor: string, city = false) {
     const house = new Group(); house.name = city ? 'voxel-village-city' : 'voxel-village-settlement';
     const batches = new Map<Material | Material[], Part[]>();
-    const surfaces = { wall: this.plaster, log: this.textures.block('bark'), roof: this.textures.get('planks'), stone: this.textures.get('stone'), leaf: this.textures.get('leaves'), flower: this.textures.get('flower'), yellow: this.textures.get('yellow'), glass: this.glass, metal: this.metal };
+    const surfaces = { wall: this.plaster, log: this.textures.block('bark'), roof: this.textures.get('planks'), stone: this.textures.get('stone'), grass: this.textures.block('grass'), dirt: this.textures.get('dirt'), leaf: this.textures.get('leaves'), flower: this.textures.get('flower'), yellow: this.textures.get('yellow'), glass: this.glass, metal: this.metal };
     const block = (kind: keyof typeof surfaces, x: number, bottom: number, z: number, w: number, h: number, d: number, tint?: Color) => {
       const material = surfaces[kind], parts = batches.get(material) || []; batches.set(material, parts);
       parts.push({ x, y: bottom + h / 2, z, w, h, d, tint });
@@ -75,6 +75,31 @@ export class VillageHouses {
       block('roof', .185, .515, -.035, .085, .035, .17);
       block('roof', .185, .55, -.035, .030, .025, .17);
     }
+    // Raise the existing house onto a small floating Skyblock island. The
+    // lowest stone sits above road height, keeping the board's edges clear.
+    const houseLift = .30;
+    for (const parts of batches.values()) for (const part of parts) part.y += houseLift;
+    for (let x = -2; x <= (city ? 3 : 2); x++) for (let z = -2; z <= 2; z++) {
+      if (Math.abs(x) === 2 && Math.abs(z) === 2 || x === 3 && Math.abs(z) > 1) continue;
+      block('grass', x * .09, .245, z * .09, .09, .055, .09);
+    }
+    // Individual soil cubes keep the pixel texture square on the exposed sides.
+    const columns = city ? 5 : 4;
+    for (let x = 0; x < columns; x++) for (let z = 0; z < 4; z++) {
+      block('dirt', (x - (columns - 1) / 2) * .09 + (city ? .025 : 0), .185, (z - 1.5) * .09, .09, .06, .09);
+    }
+    for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) block('dirt', x * .09 - .015, .135, z * .09 - .01, .09, .05, .09);
+    block('stone', .02, .105, .01, .19, .05, .19);
+    block('stone', .045, .09, .025, .10, .03, .11);
+    block('dirt', -.175, .185, .09, .07, .035, .09);
+    block('stone', .12, .16, -.105, .08, .035, .07);
+    // Tiny plants at the edge leave the doorstep and player-coloured walls open.
+    for (const [x, z] of [[-.17, .15], [.16, .17], [-.17, -.15]]) {
+      block('leaf', x, houseLift, z, .025, .035, .025);
+      block('flower', x, houseLift + .035, z, .018, .008, .018);
+      block('yellow', x, houseLift + .043, z, .006, .004, .006);
+    }
+    block('leaf', -.209, .20, .035, .016, .065, .055);
     const matrix = new Matrix4();
     for (const [material, parts] of batches) {
       const mesh = new InstancedMesh(this.box, material, parts.length);
