@@ -82,7 +82,7 @@ function dispatch(command: Command, automated = false) {
 function humanViewIndex() { if (network.session) return network.view?.self ?? game.current; if (game.pendingTrade && !game.players[game.pendingTrade.to].bot) return game.pendingTrade.to; return game.players[game.current].bot ? Math.max(0, game.players.findIndex(p => !p.bot)) : game.current; }
 function resourceIcon(r: Resource, size = 22) { return `<span class="resource-symbol ${r}">${icon(r, size)}</span>`; }
 function costHtml(cost: Partial<Hand>) { return Object.entries(cost).map(([r, n]) => `<span class="cost-item ${r}" title="${n} ${resourceName(r as Resource)}">${icon(r, 13)}${n! > 1 ? n : ''}</span>`).join(''); }
-function themeSettings() { return `<section class="theme-settings" aria-label="Tema visual"><h3>Estilo de la isla</h3><p class="form-note">Cambia la apariencia sin modificar las reglas ni tus partidas.</p><div class="theme-choices">${(['classic', 'voxel'] as ThemeId[]).map(id => `<button class="setting-row ${theme() === id ? 'selected' : ''}" data-act="theme" data-theme="${id}">${icon(id === 'voxel' ? 'cube' : 'island', 23)}<span>${id === 'voxel' ? 'Aldea cúbica' : 'Isla Universal'}<small>${id === 'voxel' ? 'Bloques, roble, hierro y aldeas' : 'Estilo natural original'}</small></span>${theme() === id ? '<b>Activo</b>' : ''}</button>`).join('')}</div><p class="form-note">El pack cúbico usa ilustraciones propias inspiradas en juegos de bloques; no incluye texturas oficiales.</p></section>`; }
+function themeSettings() { return `<section class="theme-settings" aria-label="Tema visual"><h3>Estilo de la isla</h3><p class="form-note">Elige el paisaje de tu próxima aventura. La preferencia se guarda en este dispositivo.</p><div class="theme-choices">${(['classic', 'voxel'] as ThemeId[]).map(id => `<button class="setting-row ${theme() === id ? 'selected' : ''}" data-act="theme" data-theme="${id}" aria-pressed="${theme() === id}">${icon(id === 'voxel' ? 'cube' : 'island', 23)}<span>${id === 'voxel' ? 'Mundo de bloques' : 'Isla Universal'}<small>${id === 'voxel' ? 'Bosques escalonados, minas y praderas voxel' : 'Estilo natural original'}</small></span>${theme() === id ? '<b>Activo</b>' : ''}</button>`).join('')}</div></section>`; }
 function phaseText() {
   const name = esc(game.players[game.current].name);
   if (game.pendingTrade) return { tag: 'UN TRATO SOBRE LA MESA', title: 'El comercio nos conecta.', text: `${esc(game.players[game.pendingTrade.to].name)} debe responder antes de continuar el turno.` };
@@ -396,7 +396,7 @@ app.addEventListener('click', e => {
     case 'help': showHelp(); break;
     case 'new': showNew(); break;
     case 'settings': showSettings(); break;
-    case 'theme': { const next = button.dataset.theme as ThemeId; setTheme(next); document.body.dataset.theme = next; board?.create(game); showSettings(); render(); toast(next === 'voxel' ? 'Tema Aldea cúbica activado.' : 'Tema Isla Universal activado.'); break; }
+    case 'theme': { const next = button.dataset.theme as ThemeId; if (next !== 'classic' && next !== 'voxel') break; setTheme(next); document.body.dataset.theme = next; board?.create(game); render(); showSettings(); toast(next === 'voxel' ? 'Tema Mundo de bloques activado.' : 'Tema Isla Universal activado.'); break; }
     case 'pwa-install': void installPwa(); break;
     case 'pwa-update': showPwaUpdate(); break;
     case 'pwa-dismiss': pwa.dismissUpdate(); break;

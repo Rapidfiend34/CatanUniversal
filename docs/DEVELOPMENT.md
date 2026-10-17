@@ -90,6 +90,14 @@ En producción, los documentos viven en Vercel Blob privado y sobreviven a reini
 
 El motor usa actualizaciones inmutables mediante `execute(estado, comando)`; una operación ilegal lanza `RuleError` sin modificar el estado anterior. La aleatoriedad se puede inyectar para pruebas reproducibles. La escena recibe el estado final y no decide las reglas del juego.
 
+## Paisaje Mundo de bloques
+
+En Ajustes → Estilo de la isla se puede elegir el mapa original o **Mundo de bloques**, reconstruido con pequeños dioramas de bosque, cantera, pradera, cultivo, mina y desierto. La elección se guarda por dispositivo, también en Online y Party. Se conserva la clave `isla-theme-v1` para quienes tenían el tema anterior.
+
+`src/voxel-map.ts` construye las parcelas con una huella hexagonal escalonada y cubos agrupados mediante `InstancedMesh`. Reserva espacio para números, ladrón, carreteras y cruces. `src/voxel-materials.ts` dibuja texturas originales de 16×16 con caras distintas para césped y troncos; no descarga assets y forma parte del bundle offline. La escena clásica se mantiene en su propia rama y no se superpone a los modelos voxel. Al cambiar de tema se liberan geometrías, materiales, texturas y buffers de instancias.
+
+Con Vite arrancado, `npm run test:e2e -- tests/voxel.spec.ts` verifica los cambios de tema, la persistencia, construcciones pulsando en el tablero y selección de parcelas en móvil ampliado. `node scripts/preview-biomes.mjs /tmp/catan-biomes` genera las vistas del mapa, los seis modelos y el bosque de cerca usando los mismos modelos y texturas del juego. La iluminación de las vistas individuales usa las intensidades del tablero, con una base neutra para apreciar los detalles.
+
 ## Variante ampliada
 
 `Game.variant` distingue `classic` (3–4) y `expanded` (5–10). Las partidas y salas antiguas sin variante siguen siendo clásicas. `gameRules` define terrenos, banco, mazo y puertos; los límites de validación de acciones usan la partida real. `src/save.ts` valida también guardados ampliados y conserva el balance banco + manos.
