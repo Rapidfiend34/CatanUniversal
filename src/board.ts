@@ -6,6 +6,7 @@ import { theme } from './theme';
 import { VoxelMap, BIOME_TOKEN, BIOME_ROBBER } from './voxel-map';
 import { createIllager } from './illager';
 import { VillageHouses } from './village-house';
+import { SkyblockRoads, SKYBLOCK_WALK_Y, SKYBLOCK_VERTEX_Y } from './skyblock-roads';
 
 export type Mode = 'inspect' | 'road' | 'settlement' | 'city';
 const terrain: Record<Resource | 'desert', string> = { wood: '#63876a', brick: '#c18d76', sheep: '#a4b58a', wheat: '#cfb578', ore: '#929c9d', desert: '#ddc49a' };
@@ -178,11 +179,21 @@ export class Board {
   update(g: Game, mode: Mode, interactive: boolean, numbered = false) {
     const voxel = theme() === 'voxel';
     const houses = voxel ? new VillageHouses() : null;
+    const bridges = voxel ? new SkyblockRoads() : null, junctions = new Set<number>();
     this.lastGame = g; this.lastMode = mode; this.disposeGroup(this.pieces); this.disposeGroup(this.targets);
     for (const e of g.edges) if (e.owner !== null) {
       const a = g.vertices[e.a], b = g.vertices[e.b];
+      if (bridges) {
+        const bridge = bridges.bridge(g.players[e.owner].color);
+        bridge.userData = { edge: e.id, owner: e.owner };
+        bridge.position.set((a.x + b.x) / 2, .43, (a.z + b.z) / 2); bridge.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
+        this.pieces.add(bridge); junctions.add(e.a); junctions.add(e.b); continue;
+      }
       const road = this.mesh(new THREE.BoxGeometry(.73, .095, .115), mat(g.players[e.owner].color), this.pieces, (a.x + b.x) / 2, .465, (a.z + b.z) / 2); road.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
       for (const t of [-.22, .22]) { const peg = new THREE.Mesh(new THREE.SphereGeometry(.022, 5, 4), mat('#f5ddaf')); peg.position.set(t, .052, 0); road.add(peg); }
+    }
+    if (bridges) for (const id of junctions) if (g.vertices[id].owner === null) {
+      const v = g.vertices[id], island = bridges.junction(); island.position.set(v.x, .43, v.z); island.userData.vertex = id; this.pieces.add(island);
     }
     for (const v of g.vertices) if (v.owner !== null) {
       const group = new THREE.Group(); group.position.set(v.x, .43, v.z); group.rotation.y = Math.PI / 6; this.pieces.add(group);
@@ -210,10 +221,10 @@ export class Board {
     if (g.phase === 'robber') {
       for (const t of g.tiles) if (t.id !== g.robber) { const m = this.mesh(new THREE.CylinderGeometry(.85, .85, .03, 6), new THREE.MeshStandardMaterial({ color: '#e5c16b', transparent: true, opacity: .3, emissive: '#bda866', depthWrite: false }), this.targets, t.x, .43, t.z); m.userData = { kind: 'tile', id: t.id }; }
     } else if (kind === 'road') {
-      for (const id of legalRoads(g)) { const e = g.edges[id], a = g.vertices[e.a], b = g.vertices[e.b]; const m = this.mesh(new THREE.BoxGeometry(.73, .085, .18), new THREE.MeshStandardMaterial({ color: '#faf1d0', emissive: '#a8c698', transparent: true, opacity: .8 }), this.targets, (a.x + b.x) / 2, .48, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); m.userData = { kind: 'road', id }; }
+      for (const id of legalRoads(g)) { const e = g.edges[id], a = g.vertices[e.a], b = g.vertices[e.b]; const m = this.mesh(new THREE.BoxGeometry(.73, .085, .18), new THREE.MeshStandardMaterial({ color: '#faf1d0', emissive: '#a8c698', transparent: true, opacity: .8 }), this.targets, (a.x + b.x) / 2, voxel ? SKYBLOCK_WALK_Y : .48, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); m.userData = { kind: 'road', id }; }
     } else if (kind === 'settlement' || kind === 'city') {
       const ids = kind === 'settlement' ? legalSettlements(g) : g.vertices.filter(v => v.owner === g.current && !v.city).map(v => v.id);
-      for (const id of ids) { const v = g.vertices[id]; const m = this.mesh(new THREE.CylinderGeometry(.15, .15, .035, 24), new THREE.MeshStandardMaterial({ color: '#fff0c5', emissive: '#abc78e' }), this.targets, v.x, kind === 'city' ? .92 : .46, v.z); m.userData = { kind, id }; }
+      for (const id of ids) { const v = g.vertices[id]; const m = this.mesh(new THREE.CylinderGeometry(.15, .15, .035, 24), new THREE.MeshStandardMaterial({ color: '#fff0c5', emissive: '#abc78e' }), this.targets, v.x, kind === 'city' ? voxel ? 1.35 : .92 : voxel ? SKYBLOCK_VERTEX_Y : .46, v.z); m.userData = { kind, id }; }
     }
     if (voxel) for (const target of this.targets.children) {
       const material = (target as THREE.Mesh).material as THREE.MeshStandardMaterial;
@@ -232,7 +243,7 @@ export class Board {
     if (kind === 'tile') { x = g.tiles[id].x + (theme() === 'voxel' ? BIOME_TOKEN.x : 0); z = g.tiles[id].z + (theme() === 'voxel' ? BIOME_TOKEN.z : 0); }
     else if (kind === 'road') { const e = g.edges[id]; x = (g.vertices[e.a].x + g.vertices[e.b].x) / 2; z = (g.vertices[e.a].z + g.vertices[e.b].z) / 2; }
     else { x = g.vertices[id].x; z = g.vertices[id].z; }
-    const height = kind === 'tile' && theme() === 'voxel' ? BIOME_TOKEN.y + .075 : .48;
+    const height = theme() !== 'voxel' ? .48 : kind === 'tile' ? BIOME_TOKEN.y + .075 : kind === 'road' ? SKYBLOCK_WALK_Y : kind === 'city' ? 1.35 : SKYBLOCK_VERTEX_Y;
     const p = new THREE.Vector3(x, height, z).project(this.camera), r = this.renderer.domElement.getBoundingClientRect(); return { x: r.left + (p.x + 1) / 2 * r.width, y: r.top + (1 - p.y) / 2 * r.height };
   }
   dispose() { cancelAnimationFrame(this.animation); this.observer.disconnect(); this.controls.dispose(); this.disposeGroup(this.ground); this.disposeGroup(this.pieces); this.disposeGroup(this.targets); this.disposeGroup(this.islandBase); this.scene.traverse(o => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); if (!Array.isArray(o.material)) o.material.dispose(); } }); this.renderer.dispose(); }

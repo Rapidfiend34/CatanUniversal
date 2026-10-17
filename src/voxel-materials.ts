@@ -2,7 +2,7 @@ import { CanvasTexture, MeshStandardMaterial, NearestFilter, SRGBColorSpace, typ
 
 // Original 16 × 16 pixel art. One palette per surface, rather than a resource
 // image stretched over the whole biome. No downloads are required offline.
-export type Surface = 'grass' | 'grassSide' | 'dirt' | 'stone' | 'iron' | 'bark' | 'rings' | 'leaves' | 'planks' | 'clay' | 'brick' | 'sand' | 'sandstone' | 'water' | 'wool' | 'dark' | 'wheat' | 'hay' | 'cactus' | 'flower' | 'yellow';
+export type Surface = 'grass' | 'grassSide' | 'dirt' | 'stone' | 'iron' | 'bark' | 'rings' | 'leaves' | 'planks' | 'teamPlanks' | 'clay' | 'brick' | 'sand' | 'sandstone' | 'water' | 'wool' | 'dark' | 'wheat' | 'hay' | 'cactus' | 'flower' | 'yellow';
 const colors: Record<Surface, string[]> = {
   grass: ['#6ba93a', '#78b73f', '#85bd49', '#94c650', '#5e9634'],
   grassSide: ['#90633f', '#9d7049', '#ab7d50', '#805536'],
@@ -13,6 +13,7 @@ const colors: Record<Surface, string[]> = {
   rings: ['#d8b276', '#eccb8e', '#c2975b', '#ab7a43'],
   leaves: ['#3f8832', '#4a9638', '#57a53c', '#348031', '#70b643'],
   planks: ['#b48b51', '#c79c5d', '#d1ab6d', '#98713e'],
+  teamPlanks: ['#d5d3c9', '#e4e1d5', '#f4eddf', '#b9b5a9'],
   clay: ['#bc7652', '#c8845a', '#a46345', '#dc9767'],
   brick: ['#ae5f43', '#bf7250', '#d18b63', '#824b38'],
   sand: ['#d7c28a', '#e4d29a', '#dcca94', '#c7b37d'],
@@ -38,7 +39,7 @@ function pixels(surface: Surface) {
     let index = random() < .6 ? 0 : Math.floor(random() * palette.length);
     if (surface === 'bark') index = (Math.floor(x / 3) + (random() > .8 ? 1 : 0)) % palette.length;
     if (surface === 'rings') index = Math.floor(Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)) / 1.6) % palette.length;
-    if (surface === 'planks' && y % 4 === 0) index = 3;
+    if ((surface === 'planks' || surface === 'teamPlanks') && y % 4 === 0) index = 3;
     if (surface === 'brick' && (y % 5 === 0 || (x + (Math.floor(y / 5) % 2) * 4) % 8 === 0)) index = 3;
     if (surface === 'hay') index = x % 6 === 0 ? 2 : Math.floor(random() * 2);
     if (surface === 'sandstone' && y % 6 === 0) index = 2;
