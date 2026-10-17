@@ -11,6 +11,7 @@ body[data-theme="voxel"] .brand-mark { background: #426d39; color: #e8ce90; bord
 body[data-theme="voxel"] .resource-card { border-radius: 3px; box-shadow: 0 3px 0 #37533318; }
 body[data-theme="voxel"] .resource-card .voxel-resource-icon { width: 34px; height: 34px; }
 .voxel-resource-icon { overflow: visible; mix-blend-mode: multiply; }
+.voxel-resource-icon[data-resource="wood"], .voxel-resource-icon[data-resource="wheat"] { mix-blend-mode: normal; }
 @media (max-width: 620px) { body[data-theme="voxel"] .resource-card .voxel-resource-icon { width: 26px; height: 26px; } }
 body[data-theme="voxel"] .die { border-radius: 3px; }
 @media (max-width: 620px) { .theme-choices { grid-template-columns: 1fr; } }

@@ -4,7 +4,8 @@ import sheep from './assets/resources/sheep.png';
 import brick from './assets/resources/brick.png';
 import ore from './assets/resources/ore.png';
 
-// User-supplied PNG originals. Vite fingerprints them and the PWA precaches
+// User-supplied PNG artwork (wood and hay have transparent backgrounds).
+// Vite fingerprints the images and the PWA precaches
 // emitted assets. The SVG wrapper preserves sizing in costs and resource rows.
 const sprites: Record<string, string> = { wood, wheat, sheep, brick, ore };
 export function voxelResourceIcon(name: string, size: number): string | null {
