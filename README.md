@@ -87,6 +87,8 @@ La isla, los poblados, las carreteras y los puntos quedan a la vista de todos. L
 
 Arrastra el tablero para girar la cámara y usa la rueda o los botones **+/−** para acercarte. Puedes construir directamente sobre el tablero o utilizar **Ver ubicaciones**.
 
+En **Ajustes → Sonido y música** puedes activar los efectos de dados, construcciones, intercambios y avisos, además de una música ambiental suave. Cada canal tiene su propio volumen. Tus preferencias se guardan en el navegador y el audio se pausa al ocultar la pestaña.
+
 ### Online con amigos
 
 1. Entra en **Salas online → Online** y crea una sala.

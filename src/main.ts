@@ -7,6 +7,7 @@ import { icon } from './icons';
 import QRCode from 'qrcode';
 import { RoomClient } from './online/client';
 import type { RoomView, RoomMode } from './online/types';
+import { IslandAudio, gameSounds } from './audio';
 
 const SAVE_KEY = 'isla-universal-v1';
 const network = new RoomClient();
@@ -14,9 +15,11 @@ let receivedGameVersion = -1, receivedRoomCode = '', roomOpening = false, contro
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 let game: Game;
 try { const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); validateSave(saved); game = saved; } catch { game = newGame([{ name: 'Tú', bot: false }, { name: 'Olivia', bot: true }, { name: 'Nicolás', bot: true }]); }
-let mode: Mode = 'inspect', muted = true, activeModal = '', botTimer = 0, toastTimer = 0, passTo: number | null = null;
+let mode: Mode = 'inspect', activeModal = '', botTimer = 0, toastTimer = 0, passTo: number | null = null;
 let selectedVictim: number | null = null;
-let audio: AudioContext | null = null;
+const audio = new IslandAudio();
+document.addEventListener('pointerdown', e => { if (e.isTrusted) audio.activate(); }, { capture: true });
+document.addEventListener('keydown', e => { if (e.isTrusted) audio.activate(); }, { capture: true });
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `
   <header class="topbar">
@@ -44,10 +47,6 @@ let board: Board | null = null;
 try { board = new Board(document.querySelector('#board')!); board.create(game); board.onSelect = selectBoard; }
 catch { const error = document.querySelector<HTMLDivElement>('#render-error')!; error.hidden = false; error.innerHTML = `${icon('island', 40)}<h2>Tu tablero necesita WebGL</h2><p>Activa la aceleración gráfica del navegador. Puedes continuar con «Ver ubicaciones» para construir.</p>`; }
 
-function sound(kind = 'click') {
-  if (muted) return;
-  try { audio ||= new AudioContext(); void audio.resume(); const osc = audio.createOscillator(), gain = audio.createGain(); osc.connect(gain); gain.connect(audio.destination); osc.type = 'sine'; osc.frequency.value = kind === 'build' ? 660 : kind === 'dice' ? 320 : 440; gain.gain.setValueAtTime(.055, audio.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audio.currentTime + .18); osc.start(); osc.stop(audio.currentTime + .2); } catch { /* Audio is optional. */ }
-}
 function toast(message: string) { const el = document.querySelector<HTMLDivElement>('#toast')!; el.textContent = message; el.hidden = false; window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => { el.hidden = true; }, 4200); }
 function save() { if (network.session) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch { toast('No se puede guardar en este navegador. Exporta tu partida desde el menú.'); } }
 function isHuman() { return (!network.session || network.view?.self === game.current) && !game.players[game.current].bot && passTo === null && game.phase !== 'finished' && !game.pendingTrade; }
@@ -58,11 +57,13 @@ function playerPoints(i: number) { return network.view?.game ? network.view.scor
 function dispatch(command: Command, automated = false) {
   if (network.session) { if (!network.connected || network.busy) { if (!network.connected) toast('Reconectando con la sala. Espera un momento.'); return; } void network.command(command); return; }
   try {
-    const old = game.current, previousOffer = game.pendingTrade; game = execute(game, command); mode = 'inspect';
+    const previous = game, old = game.current, previousOffer = game.pendingTrade; game = execute(game, command); mode = 'inspect';
     if (command.type === 'robber') { selectedVictim = null; if (!automated && game.phase !== 'steal') toast('No hay rivales con cartas de recursos para robar en esta parcela.'); }
     if (command.type === 'steal') { selectedVictim = null; if (activeModal === 'robbery') closeModal(); if (!automated) toast(game.log[0]); }
     if (command.type === 'respond') { if (activeModal === 'offer-pending') closeModal(); if (previousOffer && (!game.players[previousOffer.from].bot || !game.players[previousOffer.to].bot)) toast(game.log[0]); }
-    if (command.type === 'road' || command.type === 'settlement' || command.type === 'city') sound('build'); else if (command.type === 'roll') sound('dice');
+    const cues = gameSounds(previous, game, humanViewIndex());
+    if (command.type === 'dev' && !cues.includes('card')) cues.push('card');
+    cues.forEach(cue => audio.play(cue));
     if (!automated && command.type === 'end' || old !== game.current) { if (!game.players[game.current].bot && game.players.filter(p => !p.bot).length > 1 && old !== game.current) passTo = game.current; }
     save(); render(); scheduleBot();
   } catch (e) { toast(e instanceof Error ? e.message : 'No se pudo completar la acción.'); if (automated) { window.clearTimeout(botTimer); console.error('AI error', e); toast('El rival automático se ha detenido. Exporta la partida para conservarla.'); } }
@@ -221,7 +222,20 @@ function playDev(card: Dev) {
   } else { closeModal(); dispatch({ type: 'dev', card }); }
 }
 function showResults() { if (game.winner === null) return; const w = game.players[game.winner]; modal('results', `La isla es tuya, ${esc(w.name)}.`, `Una expedición inolvidable. Victoria con ${playerPoints(game.winner)} puntos en el turno ${game.turn}.`, `<div class="winner-art" style="color:${w.color}">${icon('trophy', 72)}</div><div class="results-list">${game.players.map((p, i) => ({ p, i })).sort((a, b) => playerPoints(b.i) - playerPoints(a.i)).map(({ p, i }) => `<div><span style="color:${p.color}">${icon('person', 20)} ${esc(p.name)}</span><b>${playerPoints(i)} PV</b></div>`).join('')}</div><button class="primary-button full" data-act="new">Otra isla, otra historia ${icon('arrow', 18)}</button>`); }
-function showSettings() { if (network.session) { modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `<div class="settings-actions"><button class="setting-row" data-act="sound">${icon('sound', 23)}<span>Sonidos<small>${muted ? 'Desactivados' : 'Activados'}</small></span></button><button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`); return; } modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `<div class="settings-actions"><button class="setting-row" data-act="sound">${icon('sound', 23)}<span>Sonidos sutiles<small>${muted ? 'Desactivados' : 'Activados'}</small></span><b>${muted ? 'Activar' : 'Silenciar'}</b></button><button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`); }
+function audioSettings() {
+  return `<section class="audio-settings" aria-label="Sonido y música"><h3>Sonido y música</h3>${(['effects', 'music'] as const).map(channel => {
+    const enabled = audio.preferences[channel], volume = Math.round(audio.preferences[`${channel}Volume`] * 100);
+    const label = channel === 'effects' ? 'Efectos de sonido' : 'Música ambiental';
+    return `<button class="setting-row" data-act="${channel === 'effects' ? 'sound' : 'music'}" aria-pressed="${enabled}">${icon('sound', 23)}<span>${label}<small>${channel === 'effects' ? 'Dados, construcciones, intercambios y avisos' : 'Una melodía suave para acompañar la partida'}</small></span><b>${enabled ? 'Activado' : 'Activar'}</b></button><label class="audio-volume"><span>Volumen de ${channel === 'effects' ? 'efectos' : 'música'}</span><input type="range" min="0" max="100" step="1" value="${volume}" data-audio-volume="${channel}" aria-label="Volumen de ${channel === 'effects' ? 'efectos' : 'música'}"><output>${volume}%</output></label>`;
+  }).join('')}<p class="form-note">El audio comienza al interactuar y se pausa al ocultar la pestaña. Tus preferencias se guardan en este navegador.</p></section>`;
+}
+function showSettings() {
+  if (network.session) {
+    modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `${audioSettings()}<div class="settings-actions"><button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`);
+    return;
+  }
+  modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `${audioSettings()}<div class="settings-actions"><button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`);
+}
 
 const qrCache = new Map<string, string>();
 function inviteURL() { return location.origin + location.pathname + '?room=' + network.view!.code; }
@@ -277,6 +291,7 @@ network.onUpdate = (view: RoomView) => {
     if (!keepDiscard && ['lobby', 'locations', 'trade', 'cards', 'dev-choice', 'offer-pending', 'discard', 'robbery'].includes(activeModal)) closeModal();
     if (first) { closeModal(); board?.create(game); }
     if (previous.pendingTrade && !game.pendingTrade && [previous.pendingTrade.from, previous.pendingTrade.to].includes(view.self!)) { const message = game.log.find(s => /acepta:|rechaza el intercambio/.test(s)); if (message) toast(message); }
+    if (!first) gameSounds(previous, game, view.self).forEach(cue => audio.play(cue));
     render();
   } else if (view.screen) board?.update(game, view.preview, true, true);
 };
@@ -284,7 +299,7 @@ network.onUpdate = (view: RoomView) => {
 app.addEventListener('click', e => {
   const button = (e.target as HTMLElement).closest<HTMLElement>('[data-act], [data-build], [data-location], [data-victim], [data-steal-card], [data-dev], [data-trade-tab]');
   if (!button || button.hasAttribute('disabled')) return;
-  sound();
+  audio.play();
   if (button.dataset.build) { const kind = button.dataset.build; if (kind === 'dev') dispatch({ type: 'buy' }); else { mode = kind as Mode; render(); if (network.session) void network.send({ op: 'preview', mode }); } return; }
   if (button.dataset.location) { const id = Number(button.dataset.location), kind = button.dataset.kind!; closeModal(); selectBoard(kind, id); return; }
   if (button.dataset.victim) { const id = Number(button.dataset.victim); if (game.phase === 'steal' && isHuman() && game.victims.includes(id)) { selectedVictim = id; showRobbery(); } return; }
@@ -321,7 +336,8 @@ app.addEventListener('click', e => {
     case 'zoom-in': board?.zoom(.15); break;
     case 'zoom-out': board?.zoom(-.15); break;
     case 'log': modal('log', 'Historias de la isla.', 'Las últimas 70 acciones de esta expedición.', `<div class="full-log">${game.log.map(s => `<p>${esc(s)}</p>`).join('')}</div>`); break;
-    case 'sound': muted = !muted; sound(); showSettings(); break;
+    case 'sound': audio.setEnabled('effects', !audio.preferences.effects); audio.play('turn'); showSettings(); break;
+    case 'music': audio.setEnabled('music', !audio.preferences.music); showSettings(); break;
     case 'export': { const url = URL.createObjectURL(new Blob([JSON.stringify(game, null, 2)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `isla-universal-turno-${game.turn}.json`; a.click(); URL.revokeObjectURL(url); toast('Partida exportada.'); break; }
     case 'accept-offer':
     case 'reject-offer': if (game.pendingTrade && !game.players[game.pendingTrade.to].bot && (!network.session || network.view?.self === game.pendingTrade.to)) dispatch({ type: 'respond', player: game.pendingTrade.to, accept: button.dataset.act === 'accept-offer' }); break;
@@ -339,6 +355,12 @@ app.addEventListener('submit', e => {
     const give = emptyHand(), receive = emptyHand(); RESOURCES.forEach(r => { give[r] = Number(data.get(`give-${r}`)); receive[r] = Number(data.get(`receive-${r}`)); }); const cmd: Command = { type: 'offer', player: Number(data.get('player')), give, receive };
     dispatch(cmd);
   }
+});
+app.addEventListener('input', e => {
+  const target = e.target as HTMLInputElement, channel = target.dataset.audioVolume;
+  if (channel !== 'effects' && channel !== 'music') return;
+  audio.setVolume(channel, Number(target.value) / 100);
+  const output = target.parentElement?.querySelector('output'); if (output) output.value = `${target.value}%`;
 });
 app.addEventListener('change', async e => {
   const target = e.target as HTMLInputElement;
