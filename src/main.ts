@@ -1,5 +1,6 @@
 import './style.css';
 import './theme.css';
+import './trade.css';
 import { Board, type Mode } from './board';
 import { type Game, type Variant, type Command, type Hand, type Dev, type Resource, newGame, execute, RESOURCES, NAMES as BASE_NAMES, DEV_NAMES, COSTS, total, points, legalRoads, legalSettlements, longestLength, tradeRatio, canAfford, countBuildings, emptyHand, BOT_NAMES, bankSize, isSecondary, secondaryPlayer } from './engine';
 import { validateSave } from './save';
@@ -222,15 +223,39 @@ function showRobbery() {
     <div class="robbery-victims" role="group" aria-label="Rivales afectados por el ladrón">${game.victims.map(i => `<button class="robbery-victim ${selectedVictim === i ? 'selected' : ''}" data-victim="${i}" aria-pressed="${selectedVictim === i}" style="--player:${game.players[i].color}"><span class="robbery-avatar">${icon(game.players[i].bot ? 'bot' : 'person', 22)}</span><span><strong>${esc(game.players[i].name)}</strong><small>${handCount(i)} cartas de recursos</small></span>${icon('arrow', 16)}</button>`).join('')}</div>
     ${victim ? `<div class="robbery-hand" role="group" aria-label="Cartas boca abajo de ${esc(victim.name)}">${Array.from({ length: count }, (_, i) => `<button class="hidden-card" data-steal-card="${i}" aria-label="Robar carta oculta ${i + 1} de ${esc(victim.name)}"><span class="card-back-art">${icon('island', 28)}<span>ISLA</span></span><small>${i + 1}</small></button>`).join('')}</div><p class="robbery-note">${icon('dev', 17)} Toca una carta boca abajo. Su recurso no se revela antes de elegir; las cartas de desarrollo no se pueden robar.</p>` : '<p class="robbery-note">Selecciona un rival para ver sus cartas boca abajo. Ninguna carta se robará hasta que la elijas.</p>'}`, count > 8, true);
 }
+function offerQuantity(resource: Resource, direction: 'give' | 'receive') {
+  const max = direction === 'give' ? game.players[game.current].hand[resource] : bankSize(game);
+  const description = `${NAMES[resource]} a lo que ${direction === 'give' ? 'entregas' : 'pides'}`;
+  return `<div class="trade-quantity" role="group" aria-label="${direction === 'give' ? 'Entregar' : 'Pedir'} ${NAMES[resource]}"><span class="trade-quantity-label">${direction === 'give' ? 'Entregas' : 'Pides'}</span><div><button type="button" data-act="offer-decrease" aria-label="Quitar ${description}" disabled>${icon('minus', 15)}</button><output aria-live="polite" aria-atomic="true">0</output><button type="button" data-act="offer-increase" aria-label="Añadir ${description}" ${max === 0 ? 'disabled' : ''}>${icon('plus', 15)}</button></div><input type="hidden" name="${direction}-${resource}" value="0" data-quantity-max="${max}"></div>`;
+}
+function updateOfferSelection() {
+  const form = document.querySelector<HTMLFormElement>('#offer-form'); if (!form) return;
+  let give = 0, receive = 0;
+  form.querySelectorAll<HTMLElement>('.trade-quantity').forEach(group => {
+    const input = group.querySelector<HTMLInputElement>('input')!, max = Number(input.dataset.quantityMax);
+    const value = Math.max(0, Math.min(max, Number(input.value) || 0)); input.value = String(value);
+    group.querySelector<HTMLOutputElement>('output')!.value = String(value);
+    group.querySelector<HTMLButtonElement>('[data-act="offer-decrease"]')!.disabled = value === 0;
+    group.querySelector<HTMLButtonElement>('[data-act="offer-increase"]')!.disabled = value >= max;
+    if (input.name.startsWith('give-')) give += value; else receive += value;
+  });
+  form.querySelector<HTMLButtonElement>('[data-act="offer-reset"]')!.disabled = give + receive === 0;
+  form.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled = give === 0 || receive === 0;
+}
+function changeOfferQuantity(button: HTMLElement, delta: number) {
+  const input = button.closest('.trade-quantity')?.querySelector<HTMLInputElement>('input'); if (!input) return;
+  input.value = String(Math.max(0, Math.min(Number(input.dataset.quantityMax), Number(input.value) + delta)));
+  updateOfferSelection();
+}
 function showTrade() {
   if (!isHuman() || game.phase !== 'action' || game.freeRoads || isSecondary(game)) return;
   const opts = RESOURCES.map(r => `<option value="${r}">${NAMES[r]}</option>`).join('');
   modal('trade', 'Un buen trato lo cambia todo.', 'Negocia con personas y rivales automáticos, o intercambia con el banco.', `
     <div class="tabs"><button class="tab active" data-trade-tab="bank">Banco y puertos</button><button class="tab" data-trade-tab="players">Entre jugadores</button></div>
     <form id="trade-form"><div class="trade-fields"><label class="field-label">ENTREGAS<select name="give">${opts}</select></label><span>${icon('trade', 25)}</span><label class="field-label">RECIBES<select name="receive">${opts}</select></label></div><div class="trade-ratio" id="trade-ratio"></div><p class="form-note">Los puertos se activan al construir en sus extremos. El banco tiene ${RESOURCES.map(r => `${game.bank[r]} ${NAMES[r].toLowerCase()}`).join(', ')}.</p><button class="primary-button full" type="submit">Realizar intercambio ${icon('trade', 18)}</button></form>
-    <form id="offer-form" hidden><label class="field-label">COMERCIAR CON<select name="player">${game.players.map((p, i) => i !== game.current ? `<option value="${i}">${esc(p.name)}${p.bot ? ' · IA' : ''}</option>` : '').join('')}</select></label><div class="offer-head"><span>RECURSO</span><span>ENTREGAS</span><span>PIDES</span></div>${RESOURCES.map(r => `<div class="offer-row"><span>${resourceIcon(r, 17)} ${NAMES[r]}</span><input type="number" name="give-${r}" aria-label="Entregar ${NAMES[r]}" value="0" min="0" max="${game.players[game.current].hand[r]}"><input type="number" name="receive-${r}" aria-label="Pedir ${NAMES[r]}" value="0" min="0" max="${bankSize(game)}"></div>`).join('')}
+    <form id="offer-form" hidden><label class="field-label">COMERCIAR CON<select name="player">${game.players.map((p, i) => i !== game.current ? `<option value="${i}">${esc(p.name)}${p.bot ? ' · IA' : ''}</option>` : '').join('')}</select></label><div class="offer-selection-tools"><p>Pulsa + o − para elegir las cantidades.</p><button type="button" class="outline-button small" data-act="offer-reset" aria-label="Reiniciar selección del intercambio" title="Reiniciar selección" disabled>${icon('trash', 18)}</button></div>${RESOURCES.map(r => `<div class="offer-row offer-resource-row"><span class="offer-resource-label">${resourceIcon(r, 26)}<span>${NAMES[r]}<small>Tienes ${game.players[game.current].hand[r]}</small></span></span>${offerQuantity(r, 'give')}${offerQuantity(r, 'receive')}</div>`).join('')}
     <p class="form-note">La IA valorará si el trato le ayuda a construir y te responderá. También puede proponerte intercambios durante su turno. Las cartas solo se entregan tras aceptar la oferta.</p><button class="primary-button full" type="submit">Proponer intercambio ${icon('arrow', 18)}</button></form>`);
-  updateRatio();
+  updateRatio(); updateOfferSelection();
 }
 function showPendingTrade() {
   const offer = game.pendingTrade!;
@@ -409,6 +434,9 @@ app.addEventListener('click', e => {
     case 'roll': dispatch({ type: 'roll' }); break;
     case 'end': dispatch({ type: 'end' }); break;
     case 'trade': showTrade(); break;
+    case 'offer-increase': changeOfferQuantity(button, 1); break;
+    case 'offer-decrease': changeOfferQuantity(button, -1); break;
+    case 'offer-reset': document.querySelectorAll<HTMLInputElement>('#offer-form .trade-quantity input').forEach(input => { input.value = '0'; }); updateOfferSelection(); break;
     case 'cards': showCards(); break;
     case 'locations': showLocations(); break;
     case 'results': showResults(); break;

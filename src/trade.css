@@ -1,0 +1,19 @@
+.offer-selection-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 8px; }
+.offer-selection-tools p { font-size: 11px; line-height: 1.6; color: #758469; margin: 0; }
+.offer-selection-tools [data-act="offer-reset"] { width: 44px; min-height: 44px; padding: 10px; flex-shrink: 0; }
+.offer-resource-row { grid-template-columns: minmax(0, 1fr) 112px 112px; gap: 10px; padding: 12px 0; margin: 0; border-bottom: 1px solid #e2e6d7; }
+.offer-resource-row .offer-resource-label { gap: 8px; min-width: 0; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.offer-resource-label .resource-symbol { flex-shrink: 0; }
+.offer-resource-label small { display: block; font-size: 10px; color: #758469; margin-top: 4px; }
+.trade-quantity { min-width: 0; text-align: center; }
+.trade-quantity-label { display: block; font-size: 9px; color: #758469; margin-bottom: 6px; }
+.trade-quantity > div { display: flex; align-items: center; justify-content: space-between; border: 1px solid #dce2d0; border-radius: 7px; background: #f2f4e9; overflow: hidden; }
+.trade-quantity button { display: grid; place-items: center; min-width: 36px; min-height: 44px; padding: 6px; background: transparent; border: 0; color: #496b41; touch-action: manipulation; }
+.trade-quantity button:focus-visible { outline-offset: -3px; }
+.trade-quantity output { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 26px; padding: 0 2px; }
+@media (max-width: 620px) {
+  .offer-resource-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; padding: 16px 0; }
+  .offer-resource-row .offer-resource-label { grid-column: 1 / -1; font-size: 12px; }
+  .offer-resource-label small { display: inline; margin-left: 10px; }
+  .trade-quantity button { min-width: 44px; }
+}

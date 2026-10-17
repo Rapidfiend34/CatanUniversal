@@ -133,7 +133,7 @@ test('road building before dice, city upgrade and explicit local trade consent',
   await page.locator('[data-build="city"]').click();await pickLocation(page);
   expect((await state(page)).vertices.some(v=>v.owner===0&&v.city)).toBe(true);
   await page.getByRole('button',{name:'Comerciar',exact:true}).click();await page.locator('[data-trade-tab="players"]').click();
-  await page.locator('#offer-form [name="give-wood"]').fill('1');await page.locator('#offer-form [name="receive-sheep"]').fill('1');
+  await page.locator('.trade-quantity').filter({has:page.locator('[name="give-wood"]')}).locator('[data-act="offer-increase"]').click();await page.locator('.trade-quantity').filter({has:page.locator('[name="receive-sheep"]')}).locator('[data-act="offer-increase"]').click();
   const before=await state(page);await page.getByRole('button',{name:'Proponer intercambio'}).click();
   expect((await state(page)).players[0].hand.wood).toBe(before.players[0].hand.wood);
   await page.getByRole('button',{name:'Aceptar intercambio'}).click();
@@ -158,7 +158,7 @@ test('human can select an AI, get an accepted offer, and receive a strategic rej
   async function propose(give:string,receive:string){
     await page.getByRole('button',{name:'Comerciar',exact:true}).click();await page.locator('[data-trade-tab="players"]').click();
     await page.locator('#offer-form [name="player"]').selectOption('1');
-    await page.locator(`#offer-form [name="give-${give}"]`).fill('1');await page.locator(`#offer-form [name="receive-${receive}"]`).fill('1');
+    await page.locator('.trade-quantity').filter({has:page.locator(`[name="give-${give}"]`)}).locator('[data-act="offer-increase"]').click();await page.locator('.trade-quantity').filter({has:page.locator(`[name="receive-${receive}"]`)}).locator('[data-act="offer-increase"]').click();
     await page.getByRole('button',{name:'Proponer intercambio'}).click();
   }
   await propose('ore','wood');
