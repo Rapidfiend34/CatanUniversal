@@ -88,6 +88,30 @@ export class Board {
       const tileMaterial = voxel ? new THREE.MeshStandardMaterial({ map: voxelTexture(t.resource), roughness: .95 }) : mat(terrain[t.resource]);
       this.mesh(new THREE.CylinderGeometry(.963, .963, .27, voxel ? 4 : 6), tileMaterial, group, 0, .27, 0);
       const rand = (n: number) => { const x = Math.sin(t.id * 171.3 + n * 37.17 + 1) * 43758.5453; return x - Math.floor(x); };
+      if (voxel) {
+        const block = (x: number, y: number, z: number, sx: number, sy: number, sz: number, color: string) => this.mesh(new THREE.BoxGeometry(sx, sy, sz), mat(color), group, x, y, z);
+        const base = t.resource === 'desert' ? '#a88654' : '#507a4b';
+        block(0, .08, 0, 1.72, .16, 1.72, base);
+        block(0, -.04, 0, 1.48, .08, 1.48, '#394f45');
+        if (t.resource === 'wood') {
+          for (const x of [-.48, .35]) { block(x, .56, -.18, .16, .7, .16, '#65452f'); block(x, .96, -.18, .48, .24, .48, '#2f6b3d'); block(x + .08, 1.15, -.18, .32, .2, .32, '#43884a'); }
+          block(.42, .48, .38, .34, .18, .34, '#7c5b3b');
+        } else if (t.resource === 'brick') {
+          block(-.35, .48, -.28, .6, .42, .5, '#a65d4c'); block(.28, .58, -.12, .5, .62, .42, '#b86d54');
+          block(.03, .86, -.12, .78, .12, .56, '#754940'); block(-.38, .35, .32, .18, .18, .18, '#d18b64');
+        } else if (t.resource === 'wheat') {
+          for (let x = -.5; x <= .5; x += .25) { block(x, .56, -.3, .07, .58, .07, '#a27b2b'); block(x, .82, -.3, .14, .08, .14, '#e4c65a'); }
+          block(.35, .48, .28, .38, .36, .38, '#c99b3c'); block(.35, .71, .28, .42, .08, .42, '#e3bd52');
+        } else if (t.resource === 'sheep') {
+          block(-.45, .42, -.22, .08, .38, .08, '#8b6a3f'); block(.45, .42, -.22, .08, .38, .08, '#8b6a3f'); block(0, .43, -.22, .95, .08, .08, '#9a7548');
+          block(-.15, .5, .32, .3, .24, .25, '#e4e7d4'); block(.04, .57, .32, .1, .16, .1, '#5c6358');
+        } else if (t.resource === 'ore') {
+          block(-.35, .55, -.2, .16, .85, .55, '#4a5d63'); block(.0, .48, -.2, .16, .7, .55, '#596f73'); block(.35, .4, -.2, .16, .52, .55, '#71868a');
+          for (const [x, z] of [[-.4, .25], [.15, .22], [.42, .3]]) block(x, .46, z, .08, .28, .08, '#d6c17a');
+        } else {
+          block(-.35, .55, -.2, .18, .78, .18, '#3e7c48'); block(-.35, .9, -.2, .38, .18, .18, '#4a914d'); block(.37, .42, .28, .42, .16, .42, '#d4b375');
+        }
+      }
       for (let i = 0; i < (t.resource === 'ore' ? 5 : t.resource === 'wood' ? 9 : 7); i++) {
         const a = rand(i * 3) * Math.PI * 2, radius = .4 + rand(i * 3 + 1) * .29, x = Math.cos(a) * radius, z = Math.sin(a) * radius;
         if (t.resource === 'wood') {
