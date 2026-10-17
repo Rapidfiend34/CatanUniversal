@@ -4,6 +4,7 @@ import { type Game, type Resource, legalRoads, legalSettlements } from './engine
 
 import { theme } from './theme';
 import { VoxelMap, BIOME_TOKEN, BIOME_ROBBER } from './voxel-map';
+import { createIllager } from './illager';
 
 export type Mode = 'inspect' | 'road' | 'settlement' | 'city';
 const terrain: Record<Resource | 'desert', string> = { wood: '#63876a', brick: '#c18d76', sheep: '#a4b58a', wheat: '#cfb578', ore: '#929c9d', desert: '#ddc49a' };
@@ -198,9 +199,7 @@ export class Board {
     }
     const t = g.tiles[g.robber], robber = new THREE.Group(); robber.position.set(t.x + (voxel ? BIOME_ROBBER.x : .22), voxel ? BIOME_ROBBER.y : .43, t.z + (voxel ? BIOME_ROBBER.z : .26)); this.pieces.add(robber);
     if (voxel) {
-      this.mesh(new THREE.BoxGeometry(.13, .19, .09), mat('#53545d'), robber, 0, .18, 0);
-      this.mesh(new THREE.BoxGeometry(.12, .12, .12), mat('#8d9b87'), robber, 0, .34, 0);
-      for (const dx of [-.04, .04]) this.mesh(new THREE.BoxGeometry(.045, .10, .05), mat('#383f44'), robber, dx, .05, 0);
+      robber.add(createIllager());
     } else {
     this.mesh(new THREE.ConeGeometry(.13, .3, 12), mat('#384b49'), robber, 0, .15, 0);
     this.mesh(new THREE.SphereGeometry(.09, 12, 8), mat('#384b49'), robber, 0, .34, 0);
