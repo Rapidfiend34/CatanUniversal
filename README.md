@@ -89,6 +89,8 @@ Arrastra el tablero para girar la cámara y usa la rueda o los botones **+/−**
 
 En **Ajustes → Sonido y música** puedes activar los efectos de dados, construcciones, intercambios y avisos, además de una música ambiental suave. Cada canal tiene su propio volumen. Tus preferencias se guardan en el navegador y el audio se pausa al ocultar la pestaña.
 
+El **Historial de la partida**, accesible desde el cuaderno de bitácora o desde Ajustes, muestra los últimos 70 eventos con iconos y etiquetas. Combina el filtro de jugador con construcciones, intercambios, eventos importantes, desarrollo, dados o turnos. Las ofertas y los robos aparecen para ambos jugadores implicados; un 7 también se destaca entre los eventos importantes.
+
 ### Online con amigos
 
 1. Entra en **Salas online → Online** y crea una sala.

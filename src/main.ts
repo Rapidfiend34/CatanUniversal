@@ -8,6 +8,7 @@ import QRCode from 'qrcode';
 import { RoomClient } from './online/client';
 import type { RoomView, RoomMode } from './online/types';
 import { IslandAudio, gameSounds } from './audio';
+import { HISTORY_CATEGORIES, historyEntries, filterHistory, type HistoryFilter } from './history';
 
 const SAVE_KEY = 'isla-universal-v1';
 const network = new RoomClient();
@@ -17,6 +18,7 @@ let game: Game;
 try { const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); validateSave(saved); game = saved; } catch { game = newGame([{ name: 'Tú', bot: false }, { name: 'Olivia', bot: true }, { name: 'Nicolás', bot: true }]); }
 let mode: Mode = 'inspect', activeModal = '', botTimer = 0, toastTimer = 0, passTo: number | null = null;
 let selectedVictim: number | null = null;
+let historyCategory: HistoryFilter = 'all', historyPlayer = -1;
 const audio = new IslandAudio();
 document.addEventListener('pointerdown', e => { if (e.isTrusted) audio.activate(); }, { capture: true });
 document.addEventListener('keydown', e => { if (e.isTrusted) audio.activate(); }, { capture: true });
@@ -117,6 +119,7 @@ function render() {
   else if (g.phase === 'steal' && human) showRobbery();
   else if (g.phase === 'discard' && (network.session ? network.view?.self !== null && g.discards[network.view!.self!] > 0 : !g.players[g.discards.findIndex(Boolean)]?.bot) && !(network.session && activeModal === 'discard')) showDiscard();
   else if (g.phase === 'finished' && activeModal !== 'results') showResults();
+  if (activeModal === 'log') updateHistory();
 }
 function diceDots(n: number) { return [[], [4], [0, 8], [0, 4, 8], [0, 2, 6, 8], [0, 2, 4, 6, 8], [0, 2, 3, 5, 6, 8]][n]; }
 function selectBoard(kind: string, id: number) {
@@ -143,6 +146,30 @@ function modal(name: string, title: string, subtitle: string, body: string, wide
   (root.querySelector('.modal') as HTMLElement).focus();
 }
 function closeModal() { activeModal = ''; document.querySelector('#modal-root')!.innerHTML = ''; }
+function showHistory() {
+  historyCategory = 'all'; historyPlayer = -1;
+  modal('log', 'Historias de la isla.', 'Los últimos 70 eventos de la expedición, del más reciente al más antiguo.', `
+    <div class="history-toolbar"><label class="field-label">JUGADOR<select id="history-player" aria-label="Filtrar historial por jugador"><option value="-1">Todos los jugadores</option>${game.players.map((player, i) => `<option value="${i}">${i + 1}. ${esc(player.name)}</option>`).join('')}</select></label><button class="text-button" data-act="history-reset">Limpiar filtros</button></div>
+    <div class="history-filters" role="group" aria-label="Filtrar historial por categoría">${Object.entries(HISTORY_CATEGORIES).map(([key, category]) => `<button data-act="history-filter" data-history-category="${key}" aria-pressed="${key === 'all'}">${icon(category.icon, 16)} ${category.label}<span data-history-count="${key}">0</span></button>`).join('')}</div>
+    <p id="history-count" class="history-count" role="status"></p><ol class="history-timeline" aria-label="Eventos de la partida" id="history-events"></ol>
+    <div id="history-empty" class="empty-state" hidden>${icon('compass', 32)}<h3>No hay eventos con estos filtros.</h3><p>Prueba con otro jugador o categoría.</p><button class="outline-button full" data-act="history-reset">Mostrar todo el historial</button></div>`, true);
+  updateHistory();
+}
+function updateHistory() {
+  const list = document.querySelector('#history-events'); if (!list) return;
+  const entries = historyEntries(game), filtered = filterHistory(entries, historyCategory, historyPlayer);
+  document.querySelector('#history-count')!.textContent = `${filtered.length} de ${entries.length} eventos · Más recientes primero`;
+  document.querySelector<HTMLElement>('#history-empty')!.hidden = filtered.length > 0;
+  document.querySelectorAll<HTMLButtonElement>('[data-history-category]').forEach(button => {
+    const category = button.dataset.historyCategory as HistoryFilter;
+    button.setAttribute('aria-pressed', String(category === historyCategory));
+    button.querySelector('[data-history-count]')!.textContent = String(filterHistory(entries, category, historyPlayer).length);
+  });
+  list.innerHTML = filtered.map(entry => {
+    const category = HISTORY_CATEGORIES[entry.category];
+    return `<li class="history-event history-${entry.category}"><span class="history-icon">${icon(category.icon, 21)}</span><div><div class="history-meta"><span class="history-category">${entry.category === 'all' ? 'Evento' : category.label}</span>${entry.important && entry.category !== 'important' ? '<span class="history-highlight">Importante</span>' : ''}${entry.players.map(i => `<span class="history-player">${icon('person', 12)} ${i + 1}. ${esc(game.players[i].name)}</span>`).join('')}</div><p>${esc(entry.text)}</p></div></li>`;
+  }).join('');
+}
 function rulesFields(countName: string) {
   return `<label class="field-label">REGLAS<select name="variant"><option value="classic">Clásico · 3–4 jugadores</option><option value="expanded">Ampliado · 5–10 jugadores</option></select></label><label class="field-label">JUGADORES<select name="${countName}"><option value="3">3 jugadores</option><option value="4">4 jugadores</option></select></label><p class="form-note rules-summary">Clásico: isla de 19 parcelas y banco de 19 cartas por recurso.</p>`;
 }
@@ -230,11 +257,12 @@ function audioSettings() {
   }).join('')}<p class="form-note">El audio comienza al interactuar y se pausa al ocultar la pestaña. Tus preferencias se guardan en este navegador.</p></section>`;
 }
 function showSettings() {
+  const historyLink = `<button class="setting-row" data-act="log">${icon('compass', 23)}<span>Historial de la partida<small>Filtra por jugador, construcciones, intercambios y eventos importantes</small></span>${icon('arrow', 18)}</button>`;
   if (network.session) {
-    modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `${audioSettings()}<div class="settings-actions"><button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`);
+    modal('settings', 'Tu expedición está conectada.', 'La sala se guarda en el servidor. Este dispositivo conserva tu acceso para volver al recargar.', `${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="show-invite">${icon('person', 23)}<span>Invitar a la sala<small>Código ${network.session.code}</small></span></button><button class="setting-row" data-act="leave-room">${icon('arrow', 23)}<span>Volver al juego local<small>La sala seguirá disponible durante 48 horas desde su creación</small></span></button></div>`);
     return;
   }
-  modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `${audioSettings()}<div class="settings-actions"><button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`);
+  modal('settings', 'A tu manera.', 'La partida se guarda en este navegador después de cada acción.', `${audioSettings()}<div class="settings-actions">${historyLink}<button class="setting-row" data-act="export">${icon('save', 23)}<span>Exportar partida<small>Descarga una copia en formato JSON</small></span>${icon('arrow', 18)}</button><label class="setting-row import-label">${icon('dev', 23)}<span>Importar partida<small>Continúa una partida exportada</small></span><input type="file" id="import-game" accept="application/json,.json">${icon('arrow', 18)}</label></div><p class="form-note">Partida local. No requiere cuenta ni conexión una vez cargada. También puedes crear salas online desde la barra superior.</p>`);
 }
 
 const qrCache = new Map<string, string>();
@@ -335,7 +363,9 @@ app.addEventListener('click', e => {
     case 'home': board?.home(); break;
     case 'zoom-in': board?.zoom(.15); break;
     case 'zoom-out': board?.zoom(-.15); break;
-    case 'log': modal('log', 'Historias de la isla.', 'Las últimas 70 acciones de esta expedición.', `<div class="full-log">${game.log.map(s => `<p>${esc(s)}</p>`).join('')}</div>`); break;
+    case 'log': showHistory(); break;
+    case 'history-filter': historyCategory = button.dataset.historyCategory as HistoryFilter; updateHistory(); break;
+    case 'history-reset': historyCategory = 'all'; historyPlayer = -1; document.querySelector<HTMLSelectElement>('#history-player')!.value = '-1'; updateHistory(); break;
     case 'sound': audio.setEnabled('effects', !audio.preferences.effects); audio.play('turn'); showSettings(); break;
     case 'music': audio.setEnabled('music', !audio.preferences.music); showSettings(); break;
     case 'export': { const url = URL.createObjectURL(new Blob([JSON.stringify(game, null, 2)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `isla-universal-turno-${game.turn}.json`; a.click(); URL.revokeObjectURL(url); toast('Partida exportada.'); break; }
@@ -364,6 +394,7 @@ app.addEventListener('input', e => {
 });
 app.addEventListener('change', async e => {
   const target = e.target as HTMLInputElement;
+  if (target.id === 'history-player') { historyPlayer = Number(target.value); updateHistory(); }
   if (target.name === 'variant' && target.form) updateRulesForm(target.form);
   if (target.closest('#trade-form')) updateRatio();
   if (target.id === 'import-game' && target.files?.[0]) {
